@@ -3,7 +3,7 @@
 ## ⚡ Installation & Setup
 
 ### 0. Install FreeCAD
-CADialogue requires **FreeCAD 1.0.0+** (we did not test any versions before 1.0.0).
+FreeCADAgent requires **FreeCAD 1.0.0+** (we did not test any versions before 1.0.0).
 Download and install it from the official site:
 👉 [https://www.freecad.org/downloads.php](https://www.freecad.org/downloads.php)
 
@@ -11,7 +11,7 @@ Download and install it from the official site:
 ### 1. Clone the repository
 ```
 git clone https://github.com/SA21005060/FreeCADAgent.git
-cd CADialogue
+cd FreeCADAgent
 ```
 
 ### 2. Create a virtual environment
