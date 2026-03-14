@@ -1,0 +1,352 @@
+<think>
+The user wants to create a "little boy" (a child figure) using FreeCAD via a Python macro.
+This is a complex 3D modeling task. I cannot generate a high-quality artistic mesh (like a character model) directly through code without using external libraries or importing meshes, which isn't standard for a simple FreeCAD script unless I define a very low-poly abstraction using geometric primitives (boxes, spheres, cylinders).
+
+Since the user asked for a "little boy" (小男孩), I need to create a simplified representation using basic shapes (Part workbench primitives) because writing code to generate a realistic human mesh from scratch using just math is too complex and creates messy code.
+
+I will create a "low-poly" style little boy:
+1.  **Head**: A sphere.
+2.  **Body**: A cylinder or box (shirt).
+3.  **Legs/Pants**: Cylinders or boxes.
+4.  **Arms**: Cylinders.
+5.  **Hair**: A slightly smaller sphere or specific color.
+6.  **Face**: Maybe small spheres for eyes (optional but nice).
+
+Let's plan the structure:
+- **Head**: Sphere, Radius ~15mm.
+- **Torso**: Cylinder/Box, height ~30mm.
+- **Legs**: Two cylinders, height ~30mm.
+- **Arms**: Two cylinders on the sides.
+- **Positioning**: Stacked vertically.
+
+I will use the `Part` module for geometry and `Placement` for positioning.
+
+**Code Structure:**
+1.  Import `FreeCAD`, `Part`, `Draft`.
+2.  Create the Body (Shirt).
+3.  Create the Head.
+4.  Create Pants.
+5.  Create Arms.
+6.  Create Hair.
+7.  Color them (Skin, Shirt color, Pants color, Hair color).
+8.  Group them.
+9.  Fit View.
+
+**Drafting the Python Code:**
+
+*   **Skin Color**: Light peach/white.
+*   **Shirt**: Red or Blue.
+*   **Pants**: Blue or Jeans.
+*   **Hair**: Black or Brown.
+
+*   **Head**: Sphere at (0, 0, 65).
+*   **Torso**: Cylinder/Box at (0, 0, 45).
+*   **Legs**: Cylinders at x=-5 and x=5, z=20.
+*   **Arms**: Cylinders at x=15 and x=-15, z=45.
+*   **Hair**: Sphere on top of head, slightly smaller.
+
+Wait, coordinates need to be relative to a center or just stacked.
+Let's define a `make_person` function or just execute the commands sequentially.
+
+**Refining the shapes:**
+- **Head**: Sphere, radius 10.
+- **Neck**: Cylinder, small.
+- **Body**: Box or Cylinder. Let's use a chamfered box or cylinder. Let's stick to simple primitives.
+- **Legs**: Cylinders.
+- **Arms**: Cylinders.
+
+**Color handling in FreeCAD Python:**
+`obj.ViewObject.ShapeColor = (R, G, B)`
+
+Let's write the code.
+
+```python
+import FreeCAD
+import Part
+import math
+
+# Set document
+App.ActiveDocument.addObject("Part::Feature","Head")
+# ... actually, it's easier to create shapes and then put them in the document.
+```
+
+Better approach:
+Create shapes, fuse them or just place them? Placing separate shapes is easier for a simple script.
+
+Let's define dimensions (units are usually mm):
+- Height total: ~100mm.
+- Head radius: 12
+- Body width: 20
+- Body height: 30
+- Leg height: 35
+- Arm length: 25
+
+**Step-by-step construction:**
+
+1.  **Head**: Sphere. Center (0, 0, 82). Radius 12.
+2.  **Neck**: Cylinder. (0,0, 70). Radius 4, Height 5.
+3.  **Torso (Shirt)**: Box or Cylinder. Let's do a rounded rect or just a box. Box dimensions: 20x10x30. Position (0, 0, 55).
+4.  **Arms**:
+    - Left: Cylinder. (15, 0, 55). Rotated?
+    - Right: Cylinder. (-15, 0, 55).
+    Let's assume arms hanging down or out. Let's do simple vertical cylinders for "standing" pose.
+    Position x=+/- 12. Center z=50.
+5.  **Legs (Pants)**:
+    - Left: Cylinder. (6, 0, 20).
+    - Right: Cylinder. (-6, 0, 20).
+6.  **Shoes**: Small boxes/cylinders at bottom.
+7.  **Hair**: A sphere slightly offset up or a distinct shape.
+
+Let's refine coordinates. Z=0 is the ground.
+- Legs start at Z=30 (bottom of torso) down to Z=0.
+- Torso sits on legs: Z=30 to Z=60.
+- Head sits on torso: Z=60 to Z=75 (center).
+
+Let's write the script.
+
+```python
+import FreeCAD
+import Part
+import math
+
+# Colors (R, G, B)
+color_skin = (1.0, 0.8, 0.6)
+color_shirt = (0.2, 0.5, 0.8) # Blue
+color_pants = (0.1, 0.1, 0.4) # Dark Blue
+color_hair  = (0.2, 0.1, 0.05) # Brown
+color_shoes = (0.1, 0.1, 0.1) # Black
+
+def create_cilinder(radius, height, position, rotation=(0,0,0), color=color_skin):
+    # Cylinder: height is along Z. 
+    # Position is the center of the cylinder.
+    # We need to move it so the base is at z=0 relative to placement?
+    # Actually, placing by center is easier.
+    cyl = App.ActiveDocument.addObject("Part::Cylinder", "Cylinder")
+    cyl.Radius = radius
+    cyl.Height = height
+    cyl.Placement = App.Placement(
+        App.Vector(*position), 
+        App.Rotation(*rotation)
+    )
+    cyl.ViewObject.ShapeColor = color
+    return cyl
+
+def create_box(dims, position, rotation=(0,0,0), color=color_skin):
+    box = App.ActiveDocument.addObject("Part::Box", "Box")
+    box.Width = dims[0]
+    box.Height = dims[1]
+    box.Length = dims[2]
+    # Box placement is corner? No, in FreeCAD Part::Box placement is center if created via GUI?
+    # No, standard Box is placed at origin. We need to translate.
+    # Let's use a transformation.
+    box.Placement = App.Placement(
+        App.Vector(*position),
+        App.Rotation(*rotation)
+    )
+    box.ViewObject.ShapeColor = color
+    return box
+
+def create_sphere(radius, position, color=color_skin):
+    sphere = App.ActiveDocument.addObject("Part::Sphere", "Sphere")
+    sphere.Radius = radius
+    sphere.Placement = App.Placement(
+        App.Vector(*position),
+        App.Rotation()
+    )
+    sphere.ViewObject.ShapeColor = color
+    return sphere
+
+# Clear existing objects (optional, but good for re-running)
+for obj in App.ActiveDocument.Objects:
+    App.ActiveDocument.removeObject(obj.Name)
+
+# Create Head (Skin)
+# Center Z: 75
+head = create_sphere(12, (0, 0, 75), color_skin)
+
+# Create Hair (Top of head)
+# Move slightly up and back? Just put it on top.
+# Actually, let's make the hair a sphere slightly larger on top half? 
+# Or just a sphere on top of head Z=80, Radius=10
+hair = create_sphere(12, (0, 0, 78), color_hair)
+# Use a boolean cut? Too complex. Just overlap. Or use a smaller sphere for "bangs".
+bangs = create_sphere(10, (0, 5, 80), color_hair)
+
+
+# Create Body (Shirt)
+# Center Z: 50. Height 30.
+body = create_box((20, 10, 30), (0, 0, 50), color=color_shirt)
+
+# Create Arms (Skin or Sleeves?)
+# Let's do sleeves (Shirt color) + arms (Skin).
+# Cylinder vertical.
+# Left Arm
+arm_l_sleeve = create_cilinder(4, 15, (-14, 0, 55), color=color_shirt)
+arm_l_hand = create_cilinder(3, 8, (-14, 0, 40), color=color_skin)
+
+# Right Arm
+arm_r_sleeve = create_cilinder(4, 15, (14, 0, 55), color=color_shirt)
+arm_r_hand = create_cilinder(3, 8, (14, 0, 40), color=color_skin)
+
+# Create Legs (Pants)
+# Cylinders.
+# Left Leg
+leg_l = create_cilinder(5, 35, (-6, 0, 20), color=color_pants)
+# Right Leg
+leg_r = create_cilinder(5, 35, (6, 0, 20), color=color_pants)
+
+# Create Feet (Shoes)
+# Box or Cylinder horizontal at bottom.
+# Left Foot
+shoe_l = create_box((8, 12, 5), (-6, 0, 2.5), color=color_shoes)
+# Right Foot
+shoe_r = create_box((8, 12, 5), (6, 0, 2.5), color=color_shoes)
+
+# Face features (Eyes)
+eye_l = create_sphere(1.5, (-4, 10, 77), (0,0,0)) # White/Black
+eye_r = create_sphere(1.5, (4, 10, 77), (0,0,0))
+
+# Adjust view
+Gui.activeDocument().activeView().viewIsometric()
+Gui.activeDocument().activeView().fitAll()
+```
+
+Refining the code for execution. The coordinate system for primitives (Cylinder/Box) in `App.ActiveDocument.addObject` usually places the object such that its center is at (0,0,0) locally, and the `Placement` moves that center.
+- **Cylinder**: Height is along Z axis, centered at Z=0.
+- **Box**: Dimensions are Width (X), Height (Y?), Depth (Z?) -- wait.
+  - FreeCAD Box: Length (X), Width (Y), Height (Z).
+  - FreeCAD Cylinder: Radius, Height (Z).
+
+Let's stick to the center-based placement logic I used in the pseudo-code.
+- Leg center at Z=20 implies it spans 2.5 to 37.5. That's fine.
+- Body center at Z=50 implies it spans 35 to 65. Height 30.
+- Head center at Z=75 implies top at 87, bottom at 63. Overlaps body (65). Good.
+
+The user asked for a "little boy". I should ensure the proportions look somewhat like a kid (bigger head relative to body).
+Head Radius: 15.
+Body Height: 35.
+Total Height: ~90mm.
+
+Let's polish the Python script.
+
+1.  **Clear Document**: Remove all objects to start fresh.
+2.  **Functions**: Helper functions make the code cleaner.
+3.  **Materials**: Set colors.
+4.  **View**: Set Isometric and Fit.
+
+**Python Script:**
+
+```python
+import FreeCAD
+import Part
+import math
+
+def createShape(objType, params, pos, rot, color):
+    if objType == 'Sphere':
+        obj = FreeCAD.ActiveDocument.addObject("Part::Sphere", "Sphere")
+        obj.Radius = params['radius']
+    elif objType == 'Cylinder':
+        obj = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Cylinder")
+        obj.Radius = params['radius']
+        obj.Height = params['height']
+    elif objType == 'Box':
+        obj = FreeCAD.ActiveDocument.addObject("Part::Box", "Box")
+        obj.Length = params['length']
+        obj.Width = params['width']
+        obj.Height = params['height']
+    
+    obj.Placement = FreeCAD.Placement(FreeCAD.Vector(*pos), FreeCAD.Rotation(*rot))
+    obj.ViewObject.ShapeColor = color
+    return obj
+
+# Clear document
+for obj in FreeCAD.ActiveDocument.Objects:
+    FreeCAD.ActiveDocument.removeObject(obj.Name)
+
+# Definitions
+# Position Z=0 is bottom of feet
+# Head Z ~ 80
+# Body Z ~ 55
+# Legs Z ~ 20
+
+skin_color = (1.0, 0.85, 0.73)  # Light skin tone
+shirt_color = (0.2, 0.6, 0.8)   # Blue shirt
+pants_color = (0.3, 0.3, 0.6)   # Dark blue pants
+shoes_color = (0.1, 0.1, 0.1)   # Black
+hair_color = (0.3, 0.2, 0.1)    # Brown
+
+# --- Legs (Pants) ---
+# Left Leg
+createShape('Cylinder', {'radius': 6, 'height': 40}, (-6, 0, 20), (0,0,0), pants_color)
+# Right Leg
+createShape('Cylinder', {'radius': 6, 'height': 40}, (6, 0, 20), (0,0,0), pants_color)
+
+# --- Feet (Shoes) ---
+createShape('Box', {'length': 14, 'width': 10, 'height': 8}, (-6, 0, 4), (0,0,0), shoes_color)
+createShape('Box', {'length': 14, 'width': 10, 'height': 8}, (6, 0, 4), (0,0,0), shoes_color)
+
+# --- Torso (Shirt) ---
+# A rounded box or just a box. Let's use a box with slightly wider dimensions.
+createShape('Box', {'length': 22, 'width': 12, 'height': 40}, (0, 0, 50), (0,0,0), shirt_color)
+
+# --- Arms (Sleeves + Hands) ---
+# Left Arm
+createShape('Cylinder', {'radius': 5, 'height': 20}, (-16, 0, 50), (0,0,0), shirt_color) # Sleeve
+createShape('Cylinder', {'radius': 3, 'height': 15}, (-16, 0, 32), (0,0,0), skin_color) # Hand
+
+# Right Arm
+createShape('Cylinder', {'radius': 5, 'height': 20}, (16, 0, 50), (0,0,0), shirt_color) # Sleeve
+createShape('Cylinder', {'radius': 3, 'height': 15}, (16, 0, 32), (0,0,0), skin_color) # Hand
+
+# --- Head ---
+# Sphere
+createShape('Sphere', {'radius': 14}, (0, 0, 84), (0,0,0), skin_color)
+
+# --- Hair ---
+# A slightly smaller sphere shifted up and slightly forward
+createShape('Sphere', {'radius': 14}, (0, 1, 88), (0,0,0), hair_color)
+# Bangs
+createShape('Sphere', {'radius': 12}, (0, 8, 86), (0,0,0), hair_color)
+
+# --- Face (Eyes) ---
+# Simple white spheres
+createShape('Sphere', {'radius': 2}, (-5, 10, 86), (0,0,0), (1,1,1))
+createShape('Sphere', {'radius': 2}, (5, 10, 86), (0,0,0), (1,1,1))
+# Pupils (Black)
+createShape('Sphere', {'radius': 1}, (-5, 11, 87), (0,0,0), (0,0,0))
+createShape('Sphere', {'radius': 1}, (5, 11, 87), (0,0,0), (0,0,0))
+
+# --- View Settings ---
+# Switch to isometric view
+FreeCADGui.activeDocument().activeView().viewIsometric()
+# Fit everything in view
+FreeCADGui.activeDocument().activeView().fitAll()
+```
+
+I should verify the logic.
+- Legs Z=20, height 40 -> Bottom at 0, Top at 40. Good.
+- Body Z=50, height 40 -> Bottom at 30, Top at 70. Legs go inside body. Good.
+- Head Z=84, radius 14 -> Bottom at 70. Touches body top. Good.
+- Arms Z=50 (center of sleeve). Sleeve height 20 -> 40 to 60. Body is 30 to 70. Arms attached roughly middle-high. Good.
+- Hand Z=32. Sleeve ends at 40. Hand sticks out bottom? No, hand is below sleeve. Hand Z=32, height 15 -> 24.5 to 39.5. Overlaps with sleeve end (40)? No gap. Good.
+
+This looks like a reasonable abstract representation of a little boy.
+
+Final check on user request: "Create a little boy".
+The response needs to be the Python code formatted for FreeCAD macro.
+
+One small tweak: ensure `FreeCADGui` is accessed correctly to avoid errors if run in console without GUI (though user asked for macro which implies GUI). `FreeCADGui` module might not be available in headless mode, but usually macros are run in GUI. I'll wrap view updates in try-except or check if Gui is present to be safe, or just assume standard environment.
+
+The code looks solid. I will provide the complete Python code.
+
+I will add comments to explain the parts (Head, Body, Legs).
+
+Wait, the user might want a translated macro (Chinese interface?). The prompt is in Chinese. I should explain the code in Chinese.
+
+**Plan:**
+1.  Provide the Python code block.
+2.  Explain how to use it (In FreeCAD, go to Macro -> New -> Paste -> Run).
+3.  Explain what the shapes represent.
+
+The code uses `FreeCAD.ActiveDocument` and `FreeCADGui`. This assumes a document is open. Usually, when running a macro, there is an active document. If not,
+</think>

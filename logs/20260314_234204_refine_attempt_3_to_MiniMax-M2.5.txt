@@ -1,0 +1,76 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 3**:
+
+**The following macro failed**:
+```
+import FreeCAD
+    import Part
+    import math
+
+    # 1. Define Dimensions
+    fuselage_length = 10.0
+    fuselage_radius = 1.0
+    wing_span = 12.0
+    wing_thickness = 0.5
+    wing_chord = 2.0
+    vtail_height = 3.0
+    vtail_chord = 1.5
+
+    # 2. Create Fuselage (Cylinder along X axis)
+    fuselage = App.ActiveDocument.addObject("Part::Cylinder","Fuselage")
+    fuselage.Height = fuselage_length
+    fuselage.Radius = fuselage_radius
+    # Rotate to align with X axis
+    fuselage.Placement = FreeCAD.Placement(FreeCAD.Vector(0,0,0), FreeCAD.Rotation(FreeCAD.Vector(0,1,0), 90))
+
+    # 3. Create Main Wing
+    wing = App.ActiveDocument.addObject("Part::Box","Wing")
+    wing.Width = wing_span
+    wing.Height = wing_thickness
+    wing.Length = wing_chord
+    # Centered at origin
+    wing.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -wing_chord/2, 0), FreeCAD.Rotation(0,0,0)) # Wait, let's align differently.
+    # Let's align fuselage along X. Wing usually goes across Y.
+    # Box defaults: Length=X, Height=Y, Width=Z? No.
+    # In FreeCAD Part Box: Length (X), Height (Y), Width (Z).
+    # Let's assume Wing spans Y, Chord is X, Thickness is Z.
+    wing.Length = wing_chord
+    wing.Height = wing_thickness
+    wing.Width = wing_span
+    # Center it
+    wing.Placement = FreeCAD.Placement(FreeCAD.Vector(0, 0, 0), FreeCAD.Rotation(0,0,0))
+
+    # 4. Create Vertical Tail (The one from the error)
+    vtail = App.ActiveDocument.addObject("Part::Box","Vtail")
+    vtail.Length = 1.5 # Chord
+    vtail.Height = 2.0 # Thickness (Vertical)
+    vtail.Width = vtail_height # Span (Vertical height)
+
+    # Placement logic from user error
+    # x: -fuselage_length/2 + 1 (Back of plane)
+    # y: 0 (Center)
+    # z: vtail_height/2 + 0.5 (On top of fuselage)
+    vtail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+    # Note on Rotation: The user snippet had Rotation(1,0,0), 0.
+    # If the box is created, Width is Z. If I map Width to vtail_height, it's vertical.
+    # The snippet rotation is 0.
+
+    # 5. View setup
+    # ... Gui.ActiveDocument.ActiveView.fit() ...
+```
+
+**Error Message**:
+unexpected indent (<unknown>, line 2)
+
+**User's instruction was**:
+创建一个飞机
+
+**Selection Info**:
+No selection

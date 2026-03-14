@@ -1,0 +1,139 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+import Draft
+
+def create_airplane():
+    # 获取当前活动文档，如果不存在则创建一个新的
+    doc = FreeCAD.ActiveDocument
+    if not doc:
+        doc = FreeCAD.newDocument()
+
+    # --- 1. 创建机身 (Fuselage) ---
+    # 机身主体 (圆柱体)
+    fuselage_length = 12
+    fuselage_radius = 1.0
+    body = Part.makeCylinder(fuselage_radius, fuselage_length)
+    # 旋转圆柱体使其沿X轴放置
+    body.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+
+    # 机头 (圆锥体)
+    nose_length = 3.0
+    nose = Part.makeCone(fuselage_radius, nose_length)
+    # 旋转并移动到机身前端
+    nose.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(fuselage_length/2 + nose_length/2, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+
+    # 合并机身和机头
+    fuselage_shape = body.fuse(nose)
+    fuselage_obj = doc.addObject("Part::Feature", "Fuselage")
+    fuselage_obj.Shape = fuselage_shape
+    fuselage_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8) # 灰色
+
+    # --- 2. 创建主翼 (Main Wings) ---
+    # 使用缩放的立方体来制作机翼
+    wing_span = 14.0  # 翼展
+    wing_chord = 2.5 # 翼弦长
+    wing_thick = 0.3 # 厚度
+
+    wing = Part.makeBox(wing_span, wing_thick, wing_chord)
+    # 移动到机身中间位置，并旋转
+    wing.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, 0, -wing_chord/2 + 0.2), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+
+    wing_obj = doc.addObject("Part::Feature", "MainWing")
+    wing_obj.Shape = wing
+    wing_obj.ViewObject.ShapeColor = (0.2, 0.6, 0.9) # 蓝色
+
+    # --- 3. 创建尾翼 (Tail) ---
+    # 垂直尾翼 (Vertical Stabilizer)
+    vtail_height = 3.5
+    vtail_chord = 1.5
+    vtail = Part.makeBox(1, 0.2, vtail_height)
+    # 移动到尾部上方
+    vtail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+
+    vtail_obj = doc.addObject("Part::Feature", "VerticalTail")
+    vtail_obj.Shape = vtail
+    vtail_obj.ViewObject.ShapeColor = (0.8, 0.2, 0.2) # 红色
+
+    # 水平尾翼 (Horizontal Stabilizer)
+    htail_span = 5.0
+    htail_chord = 1.2
+    htail = Part.makeBox(htail_span, 0.2, htail_chord)
+    htail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+
+    htail_obj = doc.addObject("Part::Feature", "HorizontalTail")
+    htail_obj.Shape = htail
+    htail_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8) # 灰色
+
+    # --- 4. 创建引擎 (Engines) ---
+    engine_radius = 0.4
+    engine_length = 3.0
+
+    # 左引擎
+    eng_l = Part.makeCylinder(engine_radius, engine_length)
+    eng_l.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, wing_span/4, -0.8), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+    eng_l_obj = doc.addObject("Part::Feature", "EngineLeft")
+    eng_l_obj.Shape = eng_l
+    eng_l_obj.ViewObject.ShapeColor = (0.4, 0.4, 0.4) # 深灰色
+
+    # 右引擎
+    eng_r = Part.makeCylinder(engine_radius, engine_length)
+    eng_r.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, -wing_span/4, -0.8), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+    eng_r_obj = doc.addObject("Part::Feature", "EngineRight")
+    eng_r_obj.Shape = eng_r
+    eng_r_obj.ViewObject.ShapeColor = (0.4, 0.4, 0.4)
+
+    # --- 5. 刷新视图设置 ---
+    doc.recompute()
+
+    # 设置等轴测视图并适应模型
+    try:
+        # 切换到等轴测视图
+        FreeCAD.Gui.activeDocument().activeView().viewIsometric()
+        # 缩放以适应屏幕
+        FreeCAD.Gui.SendMsgToActiveView("ViewFit")
+    except:
+        print("无法设置视图 (请在GUI模式下运行)")
+
+# 执行函数
+create_airplane()
+```
+
+**Error Message**:
+function takes at least 3 arguments (2 given)
+
+**User's instruction was**:
+创建一个飞机
+
+**Selection Info**:
+No selection

@@ -1,0 +1,23 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 2**:
+
+**The following macro failed**:
+```
+vtail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+```
+
+**Error Message**:
+name 'fuselage_length' is not defined
+
+**User's instruction was**:
+创建一个飞机
+
+**Selection Info**:
+No selection

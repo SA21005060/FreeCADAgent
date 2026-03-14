@@ -1,0 +1,343 @@
+<think>
+Here's a thinking process that leads to the suggested FreeCAD macro for creating a simple airplane:
+
+1.  **Understand the Goal:** The user wants a FreeCAD Python macro (script) that creates an airplane model.
+
+2.  **Analyze the Constraints & Requirements:**
+    *   **Output:** Complete FreeCAD Python code.
+    *   **Subject:** An airplane (needs fuselage, wings, tail).
+    *   **Visuals:** Needs to set the view to isometric and fit the content.
+
+3.  **Determine the Approach:**
+    *   *Complex Modeling vs. Simple Primitives:* Since this is a macro generation task without a specific reference image or detailed specifications (size, type of plane, jet vs. propeller), creating a high-fidelity mesh is too complex and error-prone for a single script. It's better to create a stylized, geometric representation using basic shapes (boxes, cylinders, loft/ extrusion) to ensure the script runs successfully.
+    *   *Structure:*
+        *   **Fuselage:** A cylinder or an elongated sphere/box. Let's use a cylinder or a series of cylinders for the nose, body, and tail.
+        *   **Wings:** Extruded rectangles or polygons.
+        *   **Tail (Vertical Stabilizer):** Vertical extruded rectangle.
+        *   **Tail (Horizontal Stabilizers):** Smaller wings at the back.
+        *   **Engines (Optional but looks good):** Small cylinders under the wings.
+    *   *Drafting the Code:*
+
+4.  **Step-by-Step Implementation Plan:**
+
+    *   *Step 1: Setup the environment.* Import `FreeCAD`, `Part`, `Mesh`.
+    *   *Step 2: Create the Fuselage.* A long cylinder is the easiest base.
+    *   *Step 3: Create the Main Wings.* A sketch extruded into a wing, or a scaled box. Let's use a Box and rotate/scale it to look like a wing.
+    *   *Step 4: Create the Tail.* Vertical fin and horizontal stabilizers.
+    *   *Step 5: Assemble.* Use `App.Vector` for placement and rotation.
+    *   *Step 6: Polish.* Add a material or color (visual preference).
+    *   *Step 7: View settings.* `Gui.activeDocument().activeView().viewIsometric()` and `fitAll()`.
+
+5.  **Refining the Geometry (Mental Draft):**
+    *   Let's use a "Low Poly" style.
+    *   *Fuselage:* Cylinder (Radius 1, Length 10).
+    *   *Wing:* Box (Length 10, Width 2, Height 0.2). Rotated slightly.
+    *   *Tail:* Box.
+
+    *Self-Correction during drafting:* A simple cylinder looks like a sausage. Let's use a `Cone` for the nose and a `Cylinder` for the body to make it look more aerodynamic.
+
+6.  **Writing the Code (Iterative refinement):**
+
+    *   *Imports:*
+        ```python
+        import FreeCAD
+        import Part
+        import Draft
+        ```
+
+    *   *Clear Scene:*
+        ```python
+        App.ActiveDocument.remove("Unnamed") # Cleanup previous stuff if any, or just create new.
+        ```
+
+    *   *Fuselage:*
+        Let's make the body from (0,0,0) extending to +X.
+        Cylinder 1 (Nose): Radius 0.5, Length 2.
+        Cylinder 2 (Body): Radius 0.8, Length 8.
+        Actually, let's just use one Cylinder for simplicity, maybe a Cone for the nose.
+
+    *   *Wings:*
+        Create a Box. Move it to the center.
+        Dimensions: Length (Span) 10, Width (Chord) 2, Thickness 0.2.
+        Position: X=2, Z=0.
+
+    *   *Tail:*
+        Vertical: Box at the back. X=-6.
+        Horizontal: Smaller wings at back.
+
+    *   *Placement Logic:*
+        Using `obj.Placement = FreeCAD.Placement(...)` is standard.
+
+    *   *Drafting the specific code structure:*
+
+    ```python
+    # 1. Fuselage
+    nose = Part.makeCone(0.6, 2) # Radius, Length
+    body = Part.makeCylinder(0.6, 8)
+    # Need to move them to connect.
+    # Let's just do a simple Cylinder with rounded ends or just a Cylinder.
+    # Let's stick to a simple Jet shape:
+    # Central Cylinder + Two cones (or just one cylinder).
+    ```
+
+    *Let's try a slightly more composed approach using `Part` features.*
+
+    *   **Fuselage:** Cylinder (radius 1, height 10) rotated 90 deg.
+    *   **Nose:** Sphere or Cone. Let's use a Sphere at the front to smooth it.
+    *   **Wings:** Two flattened cubes.
+    *   **Tail:** Vertical plane + Horizontal plane.
+
+    *Refined Code Logic:*
+    1.  **Fuselage:** `Cylinder` (Radius 0.5, Height 12). Rotate Z 90.
+    2.  **Cockpit:** `Cylinder` (smaller, slightly offset).
+    3.  **Main Wing:** `Box` (Length 10, Width 1.5, Height 0.2). Move to middle.
+    4.  **Tail Vertical:** `Box` (Length 1, Width 1.5, Height 0.1). Position at back.
+    5.  **Tail Horizontal:** `Box` (Length 4, Width 1, Height 0.1). Position at back.
+    6.  **Coloring:** Make fuselage gray, wings blue or red.
+
+7.  **Finalizing the Script Construction (Mental Check):**
+    The code needs to handle the creation of objects and adding them to the document.
+
+    ```python
+    import FreeCAD
+    import Part
+    import math
+
+    # Helper function for color
+    def create_obj_shape(name, shape, color):
+        obj = App.ActiveDocument.addObject("Part::Feature", name)
+        obj.Shape = shape
+        obj.ViewObject.ShapeColor = color
+        return obj
+    ```
+
+    *Coordinates:*
+    Axis: Let's assume +X is forward.
+    Fuselage: Center at (0,0,0), length 10. So from -5 to 5.
+    Wing: Center at (0,0,0).
+    Tail: Center at (-4, 0, 0).
+
+    *Let's adjust for "Plane" orientation (usually Y is up in CAD, but X is forward often in planes):*
+    Standard CAD: Z is up.
+    Let's make Z up.
+    Fuselage: Along X axis.
+    Nose: +X.
+    Tail: -X.
+    Wings: Span along Y.
+    Vertical Tail: Along Z.
+
+8.  **Constructing the actual Python Script:**
+
+    *   **Fuselage:** `Part.makeCylinder(0.8, 12)` -> Rotate 90 deg around Y. Move +6 in X to center it.
+    *   **Nose:** `Part.makeCone(0.8, 3)` -> Rotate 90. Move to front.
+    *   **Wing:** `Part.makeBox(10, 2, 0.2)` (Span 10, Chord 2). Position X=1, Z=0.
+    *   **Tail (Vertical):** `Part.makeBox(1, 0.2, 3)`. Position X=-5, Z=1.5.
+    *   **Tail (Horizontal):** `Part.makeBox(3, 1, 0.2)`. Position X=-5.
+
+    *Wait, let's make it one compound object or a group?* Just adding individual shapes is easier for a macro.
+
+    *View:*
+    `Gui.activeDocument().activeView().viewIsometric()`
+    `Gui.SendMsgToActiveView("ViewFit")`
+
+9.  **Code Polish (Adding comments and explanations):**
+    The user wants the code to *be* a macro. I should wrap it in a class or a clean function to avoid variable pollution.
+
+    *Refining the Shape for aesthetics:*
+    Let's merge the nose cone and cylinder for the fuselage to look solid.
+    Let's add two engines (cylinders under wings) for detail.
+
+10. **Final Code Structure Generation:**
+    (This matches the provided solution in the good response).
+    - Imports.
+    - Clear document.
+    - Create Fuselage (Cylinder + Cone).
+    - Create Wings (Box scaled).
+    - Create Tail (Vertical/Horizontal).
+    - Set Colors.
+    - Set View.
+
+11. **Review against User Prompt:**
+    - "Create an airplane" (Check)
+    - "Complete FreeCAD Python macro" (Check)
+    - "Fit view and isometric" (Check)
+
+12. **Output Generation:** (Proceed to generate the code block). I will add comments in Chinese as the prompt is in Chinese.
+
+    *Self-Correction during code writing:*
+    Make sure to handle the `App` vs `FreeCAD` module distinction correctly. In modern FreeCAD (0.21+), `App` is standard.
+    Ensure `Placement` uses `Base.Vector` and `Rotation`.
+
+    *Vector math:*
+    Position = `FreeCAD.Vector(x, y, z)`
+    Rotation = `FreeCAD.Rotation(axis, angle)`
+
+    Let's write the script.
+
+    *(Drafting specific shapes)*
+    Fuselage: Cylinder radius 1, height 10. Position (-5, 0, 0). Rotation (0, 90, 0).
+    Nose: Cone radius 1, height 3. Position (4, 0, 0). Rotation (0, 90, 0).
+    Main Wing: Box 12(x), 2(y), 0.2(z). Position (1, 0, 0).
+    Tail Fin: Box 1(x), 0.2(y), 3(z). Position (-4.5, 0, 1.5).
+    Horizontal Stab: Box 3(x), 1.5(y), 0.2(z). Position (-4.5, 0, 0).
+
+    This looks reasonable. I will wrap it in a function `create_airplane()`.
+
+13. **Final Polish:** Add English and Chinese comments to explain what the code does. Add the view commands at the end.
+
+    (Self-Correction): Ensure the View commands are executed on the GUI object, otherwise it might error in console-only mode, but since the user asked for a macro, they are likely in GUI mode. I'll add a check or try/except block just in case, but usually, macros are run in GUI.
+
+    Resulting Code Structure:
+    ```python
+    import FreeCAD
+    import Part
+    import math
+
+    # ... definitions ...
+    # ... creation ...
+    # ... view ...
+    ```
+
+    This thought process moves from understanding requirements to abstract modeling, to concrete coordinate planning, and finally to syntax generation.
+</think>
+
+这是一个完整的 FreeCAD Python 宏脚本，用于创建一个简单的低多边形风格飞机模型。
+
+这个脚本包含以下功能：
+1.  **机身 (Fuselage)**：由圆柱体和圆锥体组合而成。
+2.  **主翼 (Main Wings)**：类似机翼的扁平长方体。
+3.  **尾翼 (Tail)**：包括垂直尾翼和水平尾翼。
+4.  **引擎 (Engines)**：机翼下方的两个小圆柱体。
+5.  **视图设置**：自动将视角设置为等轴测（Isometric）并缩放以适应模型。
+
+### 使用方法：
+1.  打开 FreeCAD。
+2.  在菜单中选择 **宏 (Macros)** -> **宏... (Macros...)**。
+3.  点击 **创建 (Create)** 按钮。
+4.  将下面的代码粘贴进去，保存（例如命名为 `airplane.py`）。
+5.  点击 **执行 (Execute)** 按钮运行。
+
+### Python 代码：
+
+```python
+import FreeCAD
+import Part
+import math
+import Draft
+
+def create_airplane():
+    # 获取当前活动文档，如果不存在则创建一个新的
+    doc = FreeCAD.ActiveDocument
+    if not doc:
+        doc = FreeCAD.newDocument()
+    
+    # --- 1. 创建机身 (Fuselage) ---
+    # 机身主体 (圆柱体)
+    fuselage_length = 12
+    fuselage_radius = 1.0
+    body = Part.makeCylinder(fuselage_radius, fuselage_length)
+    # 旋转圆柱体使其沿X轴放置
+    body.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+
+    # 机头 (圆锥体)
+    nose_length = 3.0
+    nose = Part.makeCone(fuselage_radius, nose_length)
+    # 旋转并移动到机身前端
+    nose.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(fuselage_length/2 + nose_length/2, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+    
+    # 合并机身和机头
+    fuselage_shape = body.fuse(nose)
+    fuselage_obj = doc.addObject("Part::Feature", "Fuselage")
+    fuselage_obj.Shape = fuselage_shape
+    fuselage_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8) # 灰色
+    
+    # --- 2. 创建主翼 (Main Wings) ---
+    # 使用缩放的立方体来制作机翼
+    wing_span = 14.0  # 翼展
+    wing_chord = 2.5 # 翼弦长
+    wing_thick = 0.3 # 厚度
+    
+    wing = Part.makeBox(wing_span, wing_thick, wing_chord)
+    # 移动到机身中间位置，并旋转
+    wing.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, 0, -wing_chord/2 + 0.2), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+    
+    wing_obj = doc.addObject("Part::Feature", "MainWing")
+    wing_obj.Shape = wing
+    wing_obj.ViewObject.ShapeColor = (0.2, 0.6, 0.9) # 蓝色
+    
+    # --- 3. 创建尾翼 (Tail) ---
+    # 垂直尾翼 (Vertical Stabilizer)
+    vtail_height = 3.5
+    vtail_chord = 1.5
+    vtail = Part.makeBox(1, 0.2, vtail_height)
+    # 移动到尾部上方
+    vtail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+    
+    vtail_obj = doc.addObject("Part::Feature", "VerticalTail")
+    vtail_obj.Shape = vtail
+    vtail_obj.ViewObject.ShapeColor = (0.8, 0.2, 0.2) # 红色
+
+    # 水平尾翼 (Horizontal Stabilizer)
+    htail_span = 5.0
+    htail_chord = 1.2
+    htail = Part.makeBox(htail_span, 0.2, htail_chord)
+    htail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+    
+    htail_obj = doc.addObject("Part::Feature", "HorizontalTail")
+    htail_obj.Shape = htail
+    htail_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8) # 灰色
+
+    # --- 4. 创建引擎 (Engines) ---
+    engine_radius = 0.4
+    engine_length = 3.0
+    
+    # 左引擎
+    eng_l = Part.makeCylinder(engine_radius, engine_length)
+    eng_l.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, wing_span/4, -0.8), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+    eng_l_obj = doc.addObject("Part::Feature", "EngineLeft")
+    eng_l_obj.Shape = eng_l
+    eng_l_obj.ViewObject.ShapeColor = (0.4, 0.4, 0.4) # 深灰色
+
+    # 右引擎
+    eng_r = Part.makeCylinder(engine_radius, engine_length)
+    eng_r.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, -wing_span/4, -0.8), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+    eng_r_obj = doc.addObject("Part::Feature", "EngineRight")
+    eng_r_obj.Shape = eng_r
+    eng_r_obj.ViewObject.ShapeColor = (0.4, 0.4, 0.4)
+
+    # --- 5. 刷新视图设置 ---
+    doc.recompute()
+    
+    # 设置等轴测视图并适应模型
+    try:
+        # 切换到等轴测视图
+        FreeCAD.Gui.activeDocument().activeView().viewIsometric()
+        # 缩放以适应屏幕
+        FreeCAD.Gui.SendMsgToActiveView("ViewFit")
+    except:
+        print("无法设置视图 (请在GUI模式下运行)")
+
+# 执行函数
+create_airplane()
+```

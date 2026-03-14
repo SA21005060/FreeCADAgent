@@ -1,0 +1,20 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 2**:
+
+**The following macro failed**:
+```
+<no code extracted>
+```
+
+**Error Message**:
+Error code: 401 - {'type': 'error', 'error': {'type': 'authorized_error', 'message': "login fail: Please carry the API secret key in the 'Authorization' field of the request header (1004)", 'http_code': '401'}, 'request_id': '0604b39b75794086dbe6f502a9b7853e'}
+
+**User's instruction was**:
+创建一个小男孩
+
+**Selection Info**:
+No selection

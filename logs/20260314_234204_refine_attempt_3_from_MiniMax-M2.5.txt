@@ -1,0 +1,395 @@
+<think>
+The user wants a FreeCAD Python macro that creates a simple airplane model.
+The user provided a previous attempt (Attempt 3) which failed due to an `unexpected indent` error.
+The user also provided specific instructions: "创建一个飞机" (Create an airplane).
+I need to provide the corrected Python code, ensuring it is valid and executable in FreeCAD.
+
+**Analysis of the Failed Code:**
+
+```python
+import FreeCAD
+    import Part
+    import math
+    # ... rest of code
+```
+
+The error `unexpected indent` on line 2 suggests that `import Part` (and likely subsequent lines) are indented with spaces or tabs while `import FreeCAD` is not, or there are inconsistent indent levels. Looking at the snippet provided:
+```python
+import FreeCAD
+    import Part
+    import math
+```
+Indeed, line 2 starts with 4 spaces (or a tab), but line 1 does not. This is a syntax error in Python.
+
+**Requirements:**
+1.  **Fix the indentation:** Remove the extra indentation before `import Part` and `import math`.
+2.  **Create the geometry:** The code aims to create a fuselage (cylinder), a wing (box), and a vertical tail (box).
+3.  **View setup:** Add code to fit the view and set the isometric view.
+4.  **Language:** The user asked in Chinese, but the code comments and variable names are in English. I will keep the code in English as it was in the snippet, perhaps adding Chinese comments if appropriate, but usually, standard Python/FreeCAD macros use English.
+
+**Refining the Code Logic:**
+
+1.  **Fuselage:**
+    *   Object: `Part::Cylinder`
+    *   Dimensions: Length 10, Radius 1.
+    *   Placement: Needs to be along the X-axis. Default cylinder is along Z. Rotation needed.
+    *   *Correction:* `FreeCAD.Placement(FreeCAD.Vector(0,0,0), FreeCAD.Rotation(FreeCAD.Vector(0,1,0), 90))` rotates 90 deg around Y, making Z point to X. So the cylinder aligns with X.
+
+2.  **Wing:**
+    *   Object: `Part::Box`
+    *   Dimensions: Span 12, Chord 2, Thickness 0.5.
+    *   FreeCAD Box: Length (X), Height (Y), Width (Z).
+    *   Mapping:
+        *   Chord (X) -> Length = 2
+        *   Thickness (Z) -> Height = 0.5 ? Wait. Height is usually Y in standard CAD, but Box uses X, Y, Z explicitly.
+        *   Usually, Wing is on the X-Y plane (horizontal). Thickness is Z.
+        *   So: Length = Chord = 2, Height = Thickness = 0.5, Width = Span = 12.
+        *   Placement: Centered at origin? Usually wing is at the center of gravity, but for a simple shape, origin is fine.
+
+3.  **Vertical Tail:**
+    *   Object: `Part::Box`
+    *   Dimensions: Chord 1.5, Thickness (vertical) 2.0, Height (span/vertical) 3.0.
+    *   FreeCAD Box: Length (X), Height (Y), Width (Z).
+    *   The code snippet uses: Length=1.5, Height=2.0, Width=vtail_height (3.0).
+    *   Let's look at the orientation. Vertical tail stands up. So Width (Z) should be the vertical height.
+    *   Placement:
+        *   X: Back of plane. `-fuselage_length/2 + 1` = -5 + 1 = -4.
+        *   Y: 0.
+        *   Z: On top of fuselage. Fuselage radius is 1. V-tail height is 3. So center of V-tail should be at `radius + vtail_height/2` = `1 + 1.5` = 2.5.
+        *   The snippet used: `vtail_height/2 + 0.5` where 0.5 is presumably thickness/radius. If radius is 1, it should be 1. Let's stick to the logic: `fuselage_radius + vtail_height/2`.
+
+4.  **View Setup:**
+    *   Need to access `FreeCADGui`.
+    *   `FreeCADGui.ActiveDocument.ActiveView`.
+    *   `fit()` to fit the object.
+    *   `viewIsometric()` for isometric view.
+
+**Drafting the Fixed Code:**
+
+```python
+import FreeCAD
+import Part
+import math
+
+# Define Dimensions
+fuselage_length = 10.0
+fuselage_radius = 1.0
+wing_span = 12.0
+wing_thickness = 0.5
+wing_chord = 2.0
+vtail_height = 3.0
+vtail_chord = 1.5
+
+# 1. Create Fuselage (Cylinder along X axis)
+fuselage = App.ActiveDocument.addObject("Part::Cylinder", "Fuselage")
+fuselage.Height = fuselage_length
+fuselage.Radius = fuselage_radius
+# Rotate 90 degrees around Y axis to align cylinder (default Z) with X axis
+fuselage.Placement = FreeCAD.Placement(
+    FreeCAD.Vector(0, 0, 0), 
+    FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+)
+
+# 2. Create Main Wing
+# In FreeCAD Part::Box: Length (X), Height (Y), Width (Z)
+# Chord -> X (Length)
+# Thickness -> Z (Width) - typically wings are flat on XY plane, so thickness is Z
+# Span -> Y (Height) - Wait, usually wings span Y or Z depending on orientation.
+# Let's align Wing along Y axis (Span). Thickness along Z.
+wing = App.ActiveDocument.addObject("Part::Box", "Wing")
+wing.Length = wing_chord       # X
+wing.Height = wing_span        # Y (Span) - Usually Width is Z in Box, let's swap if we want it to span Y.
+# Actually, let's stick to the user's snippet logic but correct it to be standard.
+# Standard: Wing is on X-Y plane. Z is thickness.
+# Box Length=X, Height=Y, Width=Z.
+# Chord=X -> Length
+# Span=Y -> Height
+# Thickness=Z -> Width
+
+wing.Length = wing_chord
+wing.Height = wing_span # Span along Y
+wing.Width = wing_thickness
+# Center it
+wing.Placement = FreeCAD.Placement(
+    FreeCAD.Vector(0, 0, 0), 
+    FreeCAD.Rotation(0, 0, 0)
+)
+
+# 3. Create Vertical Tail
+vtail = App.ActiveDocument.addObject("Part::Box", "Vtail")
+vtail.Length = vtail_chord   # Chord (X)
+vtail.Height = 0.5           # Thickness (Y - minimal) - Just a flat plate vertically? Or thickness is Y?
+vtail.Width = vtail_height   # Vertical Height (Z)
+
+# Placement:
+# X: -fuselage_length/2 + some_offset
+x_pos = -fuselage_length / 2 + 1
+# Z: On top of fuselage. Fuselage radius is 1.
+z_pos = fuselage_radius + vtail_height / 2
+
+vtail.Placement = FreeCAD.Placement(
+    FreeCAD.Vector(x_pos, 0, z_pos),
+    FreeCAD.Rotation(0, 0, 0)
+)
+
+# 4. View setup
+# Need to check if GUI is available (running in console vs GUI)
+try:
+    import FreeCADGui
+    if FreeCADGui.ActiveDocument:
+        FreeCADGui.ActiveDocument.ActiveView.fit()
+        FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+except Exception as e:
+    print("View setup skipped or failed:", e)
+```
+
+**Wait, check the Wing dimensions in the user's snippet:**
+The user snippet had:
+```python
+wing.Width = wing_span
+wing.Height = wing_thickness
+wing.Length = wing_chord
+```
+In the Box, `Height` is Y, `Width` is Z.
+If `Height` is 0.5 (thickness), the wing is very thin in Y (forward/back direction relative to span?). That's weird.
+If the user wanted the wing to span across Y, `Height` (Y) should be large.
+Let's re-evaluate the user's snippet mapping in "Attempt 3":
+User: `wing.Width = wing_span` (Width is Z)
+User: `wing.Height = wing_thickness` (Height is Y)
+User: `wing.Length = wing_chord` (Length is X)
+This implies the wing is a thin strip in the Y direction? Or maybe they define Height as Z?
+In FreeCAD Sketches/Part, "Height" usually refers to the Y-axis extrusion or dimension.
+However, looking at the variable names:
+`wing_span` = 12.0 -> usually Z or -Z.
+`wing_thickness` = 0.5 -> Z.
+`wing_chord` = 2.0 -> X.
+
+If I follow the variable names literally:
+Chord = X axis.
+Span = usually extends out from center. Let's assume symmetry around X axis? No, usually around Y axis or Z axis.
+If Fuselage is along X. Wings usually extend along Y (left/right) or Z (up/down).
+Given the code `wing_span = 12.0`, let's put it on the Y axis.
+So `Height` (Y axis) should be 12.0.
+Then `Width` (Z axis) should be 0.5 (thickness).
+`Length` (X axis) is 2.0 (chord).
+
+So:
+`wing.Length = wing_chord`
+`wing.Height = wing_span`
+`wing.Width = wing_thickness`
+
+The user's code in "Attempt 3" was:
+```python
+    wing.Width = wing_span
+    wing.Height = wing_thickness
+    wing.Length = wing_chord
+```
+This puts thickness in Y (Height) and Span in Z (Width).
+I will correct this to make sense visually:
+Length = Chord (X)
+Height = Span (Y)
+Width = Thickness (Z)
+And place it at the origin.
+
+**Vertical Tail placement:**
+Code:
+`vtail.Placement = FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5)`
+Radius is 1.0.
+If height is 3.0 (Width in Box). Center is at 1.5.
+Top is at 1.5 + 1.5 = 3.0.
+Fuselage is at Z=0, radius 1. So top is Z=1.
+The tail is a box. If Width (Z) is 3.0. Center Z is 1.5.
+So it overlaps the fuselage (1.5 > 1) which is good.
+If they used `vtail_height/2 + 0.5` -> 1.5 + 0.5 = 2.0.
+Wait, 0.5 is likely an arbitrary offset.
+Let's use `fuselage_radius + vtail_height/2`. That places the center of the tail exactly on top of the cylinder.
+
+**View Setup:**
+The user specifically requested to "set the isometric view". This requires `FreeCADGui`.
+
+**Final Code Structure:**
+
+```python
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+
+# Define Dimensions
+fuselage_length = 10.0
+fuselage_radius = 1.0
+wing_span = 12.0
+wing_thickness = 0.5
+wing_chord = 2.0
+vtail_height = 3.0
+vtail_chord = 1.5
+
+# 1. Create Fuselage (Cylinder along X axis)
+fuselage = App.ActiveDocument.addObject("Part::Cylinder", "Fuselage")
+fuselage.Height = fuselage_length
+fuselage.Radius = fuselage_radius
+# Rotate 90 degrees around Y axis to align cylinder (default Z) with X axis
+fuselage.Placement = FreeCAD.Placement(
+    FreeCAD.Vector(0, 0, 0), 
+    FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+)
+
+# 2. Create Main Wing
+# Part::Box: Length (X), Height (Y), Width (Z)
+# Chord -> Length (X)
+# Span -> Height (Y)
+# Thickness -> Width (Z)
+wing = App.ActiveDocument.addObject("Part::Box", "Wing")
+wing.Length = wing_chord
+wing.Height = wing_span
+wing.Width = wing_thickness
+# Center it at origin
+wing.Placement = FreeCAD.Placement(
+    FreeCAD.Vector(0, 0, 0), 
+    FreeCAD.Rotation(0, 0, 0)
+)
+
+# 3. Create Vertical Tail
+vtail = App.ActiveDocument.addObject("Part::Box", "Vtail")
+vtail.Length = vtail_chord   # Chord (X)
+vtail.Height = 0.2           # Thickness (Y) - Small value for thickness
+vtail.Width = vtail_height   # Vertical Height (Z)
+
+# Placement at the back of the fuselage
+# X: -fuselage_length/2 + offset
+# Z: fuselage_radius + vtail_height/2 (Center of the tail sits on top of fuselage)
+vtail_placement = FreeCAD.Vector(
+    -fuselage_length / 2 + 1, 
+    0, 
+    fuselage_radius + vtail_height / 2
+)
+vtail.Placement = FreeCAD.Placement(
+    vtail_placement, 
+    FreeCAD.Rotation(0, 0, 0)
+)
+
+# 4. Recompute
+App.ActiveDocument.recompute()
+
+# 5. View setup
+if FreeCADGui.ActiveDocument:
+    FreeCADGui.ActiveDocument.ActiveView.fit()
+    FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+I will write the response explaining the fix (indentation) and providing the full code.
+
+**One detail**: The user's failed code had indentation errors:
+```python
+import FreeCAD
+    import Part
+    import math
+```
+I must ensure my output has no indentation errors.
+
+Also, the user instruction is "创建一个飞机" (Create an airplane).
+
+Let's check if the user snippet had specific color or style requests? No.
+Just fix the syntax error (indentation) and logic.
+
+Code looks solid.
+
+```python
+import FreeCAD
+import Part
+import math
+
+# ... definitions ...
+
+# 1. Fuselage
+# ...
+
+# 2. Wing
+# Correcting dimensions to map Span to Y (Height in Box) and Thickness to Z (Width in Box)
+# User code: wing.Height = wing_thickness (mapped Thickness to Y). 
+# I will map Thickness to Z for a better look.
+
+# 3. V-Tail
+# ...
+
+# 4. View
+# ...
+```
+
+The indentation error was caused by spaces before `import Part`. I will remove them.
+
+I will output the Python code block.
+
+One minor thing: `App.ActiveDocument` might be None if no document is open. It's safer to create one or rely on the user having one. Usually, FreeCAD macros assume a document exists or create a new one. I'll assume `App.ActiveDocument` exists, but adding `App.newDocument()` is safer if it's a fresh start, though standard macros usually just run. I'll stick to the user's style (using `App.ActiveDocument`).
+
+Wait, `Part::Cylinder` is created in the document.
+Placement of Cylinder:
+`FreeCAD.Placement(FreeCAD.Vector(0,0,0), FreeCAD.Rotation(FreeCAD.Vector(0,1,0), 90))`
+Rotation(0,1,0), 90 rotates around Y.
+Default cylinder is along Z. Rotating 90 deg around Y makes Z point to -X or X (Right Hand Rule).
+If Axis is (0,1,0) (Y), and angle 90 deg.
+X -> Z
+Z -> -X
+So it aligns with -X. That's fine for a fuselage.
+
+Code looks good.
+
+One final check on the user's snippet:
+```python
+    wing.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -wing_chord/2, 0), FreeCAD.Rotation(0,0,0)) # Wait, let's align differently.
+```
+There is a comment in the user's code: `# Wait, let's align differently.`
+The subsequent lines:
+```python
+    wing.Length = wing_chord
+    wing.Height = wing_thickness
+    wing.Width = wing_span
+```
+They did `Width = wing_span`. Box Width is Z. This makes the wing a vertical wall if viewed from side? No, Box Width is depth (Z). If Width is large, it extends in Z.
+If Fuselage is X.
+Wing usually spans Y.
+So Height (Y) should be the large dimension.
+User had `Height = wing_thickness` (0.5). That makes the wing extremely thin in Y.
+I will swap it to `Height = wing_span`.
+
+Okay, ready to generate.
+
+Double check the indentation error:
+```python
+import FreeCAD
+    import Part
+    import math
+```
+Lines 2 and 3 have a leading space. I will remove them.
+
+Final check on imports. `FreeCADGui` is needed for view setup. I must import it.
+
+```python
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+```
+
+The code will create the airplane and set the view.
+
+One detail: `App.ActiveDocument.addObject` creates the object. It's better to store the returned object to modify properties, but modifying by name (`fuselage.Height = ...`) works if the object was just added. However, in FreeCAD Python, it's better to use the returned object reference.
+
+The user's code uses `fuselage.Height = ...` immediately after adding. This works.
+
+One small fix in the V-tail:
+User used `vtail_height/2 + 0.5`.
+Fuselage radius is 1. So center of V-tail at Z=1.5 (if height is 3).
+If they used `0.5`, center is at 2.0. Bottom of V-tail is at 2.0 - 1.5 = 0.5.
+So it floats or intersects? Bottom is at Z=0.5. Fuselage is radius 1.
+It cuts through the fuselage. That's fine for a boolean union later, or just visual overlap.
+I'll use `fuselage_radius + vtail_height/2` to center it on the top surface of the fuselage (the cylinder's top is at Z=1). Center at 1 + 1.5 = 2.5. Bottom at 2.5-1.5=1.0. It sits exactly on top (mostly).
+
+Let's stick to a slightly cleaner placement:
+`FreeCAD.Vector(-fuselage_length/2 + 1, 0, fuselage_radius + vtail_height/2)`
+
+Final plan:
+1. Define vars.
+2. Create Cylinder (Fuselage).
+3. Create Box (Wing)
+</think>

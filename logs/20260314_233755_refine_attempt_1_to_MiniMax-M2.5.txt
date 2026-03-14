@@ -1,0 +1,123 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+
+# Colors (R, G, B)
+color_skin = (1.0, 0.8, 0.6)
+color_shirt = (0.2, 0.5, 0.8) # Blue
+color_pants = (0.1, 0.1, 0.4) # Dark Blue
+color_hair  = (0.2, 0.1, 0.05) # Brown
+color_shoes = (0.1, 0.1, 0.1) # Black
+
+def create_cilinder(radius, height, position, rotation=(0,0,0), color=color_skin):
+    # Cylinder: height is along Z. 
+    # Position is the center of the cylinder.
+    # We need to move it so the base is at z=0 relative to placement?
+    # Actually, placing by center is easier.
+    cyl = App.ActiveDocument.addObject("Part::Cylinder", "Cylinder")
+    cyl.Radius = radius
+    cyl.Height = height
+    cyl.Placement = App.Placement(
+        App.Vector(*position), 
+        App.Rotation(*rotation)
+    )
+    cyl.ViewObject.ShapeColor = color
+    return cyl
+
+def create_box(dims, position, rotation=(0,0,0), color=color_skin):
+    box = App.ActiveDocument.addObject("Part::Box", "Box")
+    box.Width = dims[0]
+    box.Height = dims[1]
+    box.Length = dims[2]
+    # Box placement is corner? No, in FreeCAD Part::Box placement is center if created via GUI?
+    # No, standard Box is placed at origin. We need to translate.
+    # Let's use a transformation.
+    box.Placement = App.Placement(
+        App.Vector(*position),
+        App.Rotation(*rotation)
+    )
+    box.ViewObject.ShapeColor = color
+    return box
+
+def create_sphere(radius, position, color=color_skin):
+    sphere = App.ActiveDocument.addObject("Part::Sphere", "Sphere")
+    sphere.Radius = radius
+    sphere.Placement = App.Placement(
+        App.Vector(*position),
+        App.Rotation()
+    )
+    sphere.ViewObject.ShapeColor = color
+    return sphere
+
+# Clear existing objects (optional, but good for re-running)
+for obj in App.ActiveDocument.Objects:
+    App.ActiveDocument.removeObject(obj.Name)
+
+# Create Head (Skin)
+# Center Z: 75
+head = create_sphere(12, (0, 0, 75), color_skin)
+
+# Create Hair (Top of head)
+# Move slightly up and back? Just put it on top.
+# Actually, let's make the hair a sphere slightly larger on top half? 
+# Or just a sphere on top of head Z=80, Radius=10
+hair = create_sphere(12, (0, 0, 78), color_hair)
+# Use a boolean cut? Too complex. Just overlap. Or use a smaller sphere for "bangs".
+bangs = create_sphere(10, (0, 5, 80), color_hair)
+
+
+# Create Body (Shirt)
+# Center Z: 50. Height 30.
+body = create_box((20, 10, 30), (0, 0, 50), color=color_shirt)
+
+# Create Arms (Skin or Sleeves?)
+# Let's do sleeves (Shirt color) + arms (Skin).
+# Cylinder vertical.
+# Left Arm
+arm_l_sleeve = create_cilinder(4, 15, (-14, 0, 55), color=color_shirt)
+arm_l_hand = create_cilinder(3, 8, (-14, 0, 40), color=color_skin)
+
+# Right Arm
+arm_r_sleeve = create_cilinder(4, 15, (14, 0, 55), color=color_shirt)
+arm_r_hand = create_cilinder(3, 8, (14, 0, 40), color=color_skin)
+
+# Create Legs (Pants)
+# Cylinders.
+# Left Leg
+leg_l = create_cilinder(5, 35, (-6, 0, 20), color=color_pants)
+# Right Leg
+leg_r = create_cilinder(5, 35, (6, 0, 20), color=color_pants)
+
+# Create Feet (Shoes)
+# Box or Cylinder horizontal at bottom.
+# Left Foot
+shoe_l = create_box((8, 12, 5), (-6, 0, 2.5), color=color_shoes)
+# Right Foot
+shoe_r = create_box((8, 12, 5), (6, 0, 2.5), color=color_shoes)
+
+# Face features (Eyes)
+eye_l = create_sphere(1.5, (-4, 10, 77), (0,0,0)) # White/Black
+eye_r = create_sphere(1.5, (4, 10, 77), (0,0,0))
+
+# Adjust view
+Gui.activeDocument().activeView().viewIsometric()
+Gui.activeDocument().activeView().fitAll()
+```
+
+**Error Message**:
+name 'App' is not defined
+
+**User's instruction was**:
+创建一个小男孩
+
+**Selection Info**:
+No selection

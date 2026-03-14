@@ -1,10 +1,18 @@
 fastapi
 uvicorn
-pydantic
+
 sounddevice
 soundfile
 
 torch
-requests
-sentence-transformers
+
+# sentence-transformers
 dotenv
+
+protobuf>=5.29.5
+grpcio>=1.73.1  
+
+# Support Packages
+python-dotenv>=1.1.1  # For .env configuration
+requests>=2.32.4  # HTTP requests
+pydantic>=2.11.7  # Data validation

@@ -1,0 +1,374 @@
+<think>
+1.  **Identify the user's request:** The user wants to create a "boy" (presumably a 3D model of a boy) using a FreeCAD Python macro.
+
+2.  **Analyze the complexity:** Creating a realistic human figure (a "boy") in a CAD environment (like FreeCAD) using just a Python script is extremely complex, if not impossible, without external meshes or complex boolean operations on primitives. A low-poly or abstract representation is the most practical approach for a generated script.
+
+3.  **Determine the approach:**
+    *   I cannot generate a photorealistic human model from scratch in code easily.
+    *   I should create a simplified, stylized figure using basic geometric shapes (cylinders, spheres) to represent a boy.
+    *   *Body parts:* Head (sphere), Torso (cylinder/box), Arms (cylinders), Legs (cylinders), Hair (sphere/cone).
+    *   *Colors:* Skin tone, Shirt color, Pants color.
+
+4.  **Drafting the geometry (mental model):**
+    *   **Origin:** Let's place the figure standing at (0, 0, 0).
+    *   **Head:** Sphere at z = height_of_legs + height_of_torso + radius. Let's say total height ~100mm.
+    *   **Torso:** Cylinder or Box. Let's use a Box for the shirt.
+    *   **Legs:** Two cylinders or boxes.
+    *   **Arms:** Two cylinders.
+    *   **Hair:** A slightly larger sphere or a cone on top.
+
+5.  **Writing the FreeCAD Python Code:**
+
+    *   *Imports:* `FreeCAD, Part, Mesh, Draft, math, sys`.
+    *   *Setup:* Create a new document.
+    *   *Materials (Colors):*
+        *   Skin: (1, 0.8, 0.6)
+        *   Shirt: Blue
+        *   Pants: Dark Blue/Black
+        *   Hair: Brown
+
+    *   *Construction:*
+        *   **Legs:** Two cylinders. Height ~40, Radius ~5. Positioned at x = +/- 5.
+        *   **Torso:** Box. Height ~30, Width ~20, Depth ~10. Positioned above legs.
+        *   **Head:** Sphere. Radius ~12. Positioned on top of torso.
+        *   **Arms:** Cylinders attached to the sides of the torso.
+        *   **Hair:** A sphere slightly offset on top of the head.
+
+    *   *Refining coordinates:*
+        *   Legs: z = 0 to 40. y = +/- 5.
+        *   Torso: z = 40 to 70. (Base at 40).
+        *   Head: z = 70 + 12 = 82. Center at (0, 0, 82).
+        *   Arms: Side of torso.
+
+6.  **Refining the code structure:**
+
+    ```python
+    import FreeCAD
+    import Part
+    import Draft
+
+    # Create doc
+    doc = FreeCAD.newDocument("Boy")
+
+    # Dimensions
+    leg_height = 40
+    leg_radius = 4
+    torso_height = 30
+    torso_width = 16
+    torso_depth = 10
+    head_radius = 10
+    arm_length = 25
+    arm_radius = 3
+
+    # Colors (R, G, B)
+    color_skin = (1.0, 0.8, 0.6)
+    color_shirt = (0.2, 0.4, 0.8)
+    color_pants = (0.1, 0.1, 0.3)
+    color_hair = (0.4, 0.2, 0.0)
+
+    # Function to make shape and set color
+    def make_part(shape, color, label):
+        obj = doc.addObject("Part::Feature", label)
+        obj.Shape = shape
+        obj.ViewObject.ShapeColor = color
+        return obj
+
+    # 1. Legs (Pants)
+    leg_y_offset = 5
+    # Left Leg
+    leg1 = Part.makeCylinder(leg_radius, leg_height, FreeCAD.Vector(-leg_y_offset, 0, 0))
+    # Right Leg
+    leg2 = Part.makeCylinder(leg_radius, leg_height, FreeCAD.Vector(leg_y_offset, 0, 0))
+    # Merge legs? Or keep separate. Keep separate is easier for coloring.
+    make_part(leg1, color_pants, "LeftLeg")
+    make_part(leg2, color_pants, "RightLeg")
+
+    # 2. Torso (Shirt)
+    # Box centered at x=0, y=0. z starts at leg_height
+    torso = Part.makeBox(torso_width, torso_depth, torso_height,
+                         FreeCAD.Vector(-torso_width/2, -torso_depth/2, leg_height))
+    make_part(torso, color_shirt, "Torso")
+
+    # 3. Arms
+    # Left Arm
+    arm1 = Part.makeCylinder(arm_radius, arm_length,
+                             FreeCAD.Vector(-(torso_width/2 + arm_radius), 0, leg_height + torso_height - arm_length/2 - 5))
+    # Rotate arm? Let's keep it simple (vertical) or slight angle. Let's do vertical hanging for simplicity, or slightly out.
+    # Let's make it simple: vertical.
+    make_part(arm1, color_skin, "LeftArm")
+
+    # Right Arm
+    arm2 = Part.makeCylinder(arm_radius, arm_length,
+                             FreeCAD.Vector((torso_width/2 + arm_radius), 0, leg_height + torso_height - arm_length/2 - 5))
+    make_part(arm2, color_skin, "RightArm")
+
+    # 4. Head
+    head_z = leg_height + torso_height + head_radius
+    head = Part.makeSphere(head_radius, FreeCAD.Vector(0, 0, head_z))
+    make_part(head, color_skin, "Head")
+
+    # 5. Hair
+    # Simple cap
+    hair_z = head_z + head_radius - 2
+    hair = Part.makeSphere(head_radius + 1, FreeCAD.Vector(0, 0, hair_z - 2)) # Slightly offset
+    # Actually, a sphere slightly larger and cut? Or just a half sphere? Just a sphere on top is easiest.
+    # Let's try a Cone for hair or just a different colored sphere on top.
+    hair = Part.makeSphere(head_radius + 2, FreeCAD.Vector(0, 0, head_z + 8))
+    make_part(hair, color_hair, "Hair")
+
+    # Recompute
+    doc.recompute()
+
+    # Camera View
+    gui = FreeCADGui
+    if gui:
+        gui.ActiveDocument.activeView().viewIsometric()
+        gui.ActiveDocument.activeView().fitAll()
+    ```
+
+7.  **Refinement of the Geometry:**
+    *   The code above creates separate parts. To make it look like a "boy", I should adjust positions so they connect logically.
+    *   Legs: z from 0 to 40.
+    *   Torso: z from 40 to 70.
+    *   Arms: Attached to the side of the torso.
+    *   Head: z from 70 to 70 + 2*10 = 90.
+    *   Hair: On top of head.
+
+    *Wait, FreeCAD coordinates:*
+    *   Z is up usually in FreeCAD.
+    *   Legs: Center at z=20.
+    *   Torso: Center at z=55 (40 + 15).
+    *   Head: Center at z=80 (70 + 10).
+    *   This is cleaner math.
+
+    *Revised Plan:*
+    *   Legs: Cylinder(r=4, h=40). Placed at z=20.
+    *   Torso: Box(w=20, d=12, h=30). Placed at z=50.
+    *   Head: Sphere(r=10). Placed at z=75.
+    *   Arms: Cylinder(r=3, h=25). Placed at z=55.
+
+    *Hair:* A half-sphere or just a smaller sphere on top. Let's use a sphere cut by a plane? Too complex for a simple script. Let's just use a Cone or a Sphere slightly offset. Let's use a Sphere for "messy hair".
+
+    *Code logic update:*
+    Use `doc.addObject("Part::Feature", ...)` directly. Setting colors requires `obj.ViewObject.ShapeColor`.
+
+8.  **Final Code Structure Check:**
+    *   Import `FreeCAD, Part, Draft`.
+    *   Check if GUI is available for the view setting (crucial for the "fit view" requirement).
+    *   Define colors clearly.
+    *   Construct parts.
+    *   Recompute.
+    *   Set View.
+
+9.  **Language:** The user asked in Chinese ("创建一个男孩" - Create a boy). I should provide the explanation in Chinese, but the code comments can be English or Chinese (Chinese is better for Chinese users). I will make the code comments Chinese for better user understanding.
+
+10. **Self-Correction/Optimization:**
+    *   Ensure the `FreeCADGui` check is robust (it crashes if run in console without GUI).
+    *   Make sure the parts actually overlap slightly so there are no gaps (e.g., head goes into torso, arms go into torso).
+
+    *Revised Dimensions:*
+    *   Legs: z=0 to 40. Center 20.
+    *   Torso: z=38 to 68. (Overlaps legs slightly). Height 30.
+    *   Head: z=68 to 88. (Overlaps torso). Radius 10.
+    *   Arms: Side of torso.
+
+    Let's write the final script based on this logical stack.
+
+    *   **Head**: Sphere (r=12) at (0,0, 80)
+    *   **Torso**: Box (20x12x30) at (0,0, 50)
+    *   **Legs**: Cylinder (r=5, h=40) at (-5, 0, 20) and (5, 0, 20)
+    *   **Arms**: Cylinder (r=3, h=30) at (-14, 0, 50) and (14, 0, 50)
+    *   **Hair**: Sphere (r=13) at (0,0, 80) - wait, if same center, it covers face. Need to shift up.
+        *   Head center: 0,0,80. Top is 92.
+        *   Hair center: 0,0,85. Radius 13. Covers top half.
+
+    Let's stick to the "Stick figure-ish" but "Chunky" style (South Park style) which is common for basic CAD modeling.
+
+    *Colors:*
+    *   Skin: (1, 0.85, 0.7)
+    *   Shirt: Red (0.8, 0.2, 0.2)
+    *   Pants: Blue (0.2, 0.2, 0.6)
+    *   Hair: Brown (0.4, 0.2, 0.0)
+    *   Shoes: Black (0.1, 0.1, 0.1)
+
+    *Code construction:*
+    `doc = App.newDocument()` is standard.
+    `Part.make...` creates shapes.
+    `obj = doc.addObject('Part::Feature', 'Name')` puts shape in doc.
+    `obj.Shape = shape` assigns it.
+    `obj.ViewObject.ShapeColor = ...` colors it.
+
+    *View:*
+    `FreeCADGui.ActiveDocument.ActiveView.viewIsometric()`
+    `FreeCADGui.ActiveDocument.ActiveView.fitAll()`
+
+    This looks solid. I will generate the Python code now.
+
+    *One detail:* Creating a "Boy" might imply a face. Doing a face in code primitives is hard. I will skip eyes/mouth to keep the code clean and robust, relying on the "hair" and "clothing" to convey "boy".
+
+    *Wait, I need to make sure I use the correct API for FreeCAD.*
+    `FreeCAD.ActiveDocument` vs `App.ActiveDocument`. In modern FreeCAD (0.21/1.0), it's usually `App` for logic and `Gui` for view.
+    I will use `FreeCAD` module namespace which is safer for macros usually.
+
+    *Final check on "Boy" composition:*
+    1. Legs (x2) - Cylinders
+    2. Torso - Box
+    3. Arms (x2) - Cylinders
+    4. Head - Sphere
+    5. Hair - Sphere (smaller, on top)
+
+    Let's go.
+
+    *Adding Shoes:* Just small cylinders at the bottom of legs.
+    *Adding Ears:* Small spheres on the side of head? Maybe too much detail. Keep it simple.
+
+    Let's assemble the script.
+
+    (Self-Correction during drafting code):
+    Make sure to handle the case where the user runs this inside the FreeCAD Python console.
+
+    Code Outline:
+    1. Imports
+    2. Function to create part (to reduce repetition)
+    3. Create parts
+    4. Recompute
+    5. Adjust View
+
+    Okay, ready to write.
+
+    *Output Language:* The prompt is in Chinese. I will output the response in Chinese.
+
+    *Script:*
+    ```python
+    import FreeCAD
+    import Part
+    import math
+
+    # ... definitions ...
+    ```
+
+    *Specifics for "Boy":*
+    Height: ~80-90 units.
+    Colors:
+    Skin: (1.0, 0.8, 0.6)
+    Shirt: Blue
+    Pants: Jeans Blue
+    Shoes: Black
+
+    Let's finalize the positions.
+    Z=0 is floor.
+    Legs: z=0 to 35. (Height 35)
+    Torso: z=32 to 62. (Height 30, overlap 3)
+    Head: z=62 to 82. (Radius 10)
+    Hair: On top.
+
+    Sounds good.
+
+    *One last thing:* `FreeCAD.newDocument()` vs `FreeCAD.ActiveDocument`. I'll use `FreeCAD.newDocument("BoyModel")` to ensure a clean slate.
+
+    *Fit View:* `Gui.ActiveDocument.ActiveView.fitAll()` is the standard way.
+
+    *Code generation:*
+    I will write the code clearly with comments.
+
+    *Structure:*
+    ```python
+    import FreeCAD
+    import Part
+    import FreeCADGui # Required for view settings
+
+    # Create new document
+    doc = FreeCAD.newDocument("Boy")
+
+    # Define colors (R, G, B)
+    ...
+
+    # Helper function
+    def create_part(shape, color, name):
+        ...
+
+    # Create geometry
+    ...
+    ```
+    This looks correct. I will now generate the full response.
+
+    (Wait, I need to ensure the hair sits *on* the head properly. If Head is sphere at (0,0,Z), top is Z+r. Hair should be centered at Z+r - offset. If Hair is sphere r2, center should be Z+r - r2/2 roughly to look like a volume on top. Or just overlap. I'll use overlap to ensure it looks solid.)
+
+    Let's write it.
+
+    *Translate technical terms to Chinese in comments:*
+    Head -> 头
+    Torso -> 躯干
+    Legs -> 腿
+
+    This will be helpful for the user.
+
+    Final check: "Create a boy".
+    Is it a specific pose? Standing is best.
+    Does he need arms? Yes.
+    Does he need legs? Yes.
+    Hair is important to distinguish from a generic "human".
+
+    Okay, proceed.
+
+    *One small error check:* `FreeCAD.Vector` requires `FreeCAD.Vector(x,y,z)`.
+    `Part.makeCylinder` takes `(radius, height, center_vector, axis_vector, angle)`.
+    `Part.makeBox` takes `(length, width, height, center_vector)`.
+    Note: `makeBox` center is the center of the box, unlike some other CAD systems.
+    If I want the box base at Z=32, center is Z = 32 + height/2 = 32 + 15 = 47.
+    Legs: Base at 0. Center = 35/2 = 17.5.
+    Head: Base at 62. Center = 62 + 10 = 72.
+
+    Okay, I will do the math in the code variables.
+
+    Let's generate.
+</think>
+
+这是一个使用 FreeCAD Python 编写的宏，用于创建一个抽象的、Low-Poly 风格的小男孩模型。
+
+这个脚本会生成头部、身体、腿、手臂和头发，并自动为它们上色，最后调整视角以便于观察。
+
+### 使用方法：
+1. 打开 FreeCAD。
+2. 在菜单中选择 **工具** -> **宏...**。
+3. 在弹出窗口中点击 **新建**。
+4. 将下面的代码粘贴进去。
+5. 点击 **保存**，命名为 `CreateBoy`。
+6. 再次点击 **执行** (或按 F6)。
+
+### Python 代码：
+
+```python
+import FreeCAD
+import Part
+import FreeCADGui
+
+# --- 1. 准备工作：创建新文档 ---
+# 如果已有打开的文档，可以选择关闭或忽略，这里我们创建一个新的独立文档
+doc = FreeCAD.newDocument("Boy_Model")
+
+# --- 2. 定义参数和颜色 ---
+# 颜色格式 (R, G, B)，取值范围 0.0 - 1.0
+color_skin  = (1.0, 0.85, 0.72)  # 肤色
+color_shirt = (0.2, 0.5, 0.9)   # 蓝色衬衫
+color_pants = (0.2, 0.3, 0.5)   # 深色牛仔裤
+color_hair  = (0.4, 0.2, 0.05)  # 棕色头发
+color_shoes = (0.1, 0.1, 0.1)   # 黑色鞋子
+
+# 尺寸参数
+leg_height   = 35
+leg_radius   = 4.5
+torso_height = 30
+torso_width  = 20
+torso_depth  = 12
+head_radius  = 11
+arm_length   = 28
+arm_radius   = 3.5
+hair_radius  = 12
+
+# --- 3. 辅助函数：创建并着色几何体 ---
+def create_primitive(shape, color, name):
+    """创建一个几何体，设置颜色，并添加到文档"""
+    obj = doc.addObject("Part::Feature", name)
+    obj.Shape = shape
+    # 设置颜色

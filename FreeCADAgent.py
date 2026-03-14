@@ -12,7 +12,36 @@ import requests
 import threading
 import time
 import datetime
-from sentence_transformers import SentenceTransformer, util
+
+# from llm_client2 import llm_client
+
+from llm_client import prompt_llm
+from pathlib import Path
+
+
+
+GEN_SCRIPT = Path("generated/result_script.py")
+RUN_SCRIPT = Path("src/run_freecad.py")
+LOG_FILE = Path("generated/last_run_log.txt")
+BASE_INSTRUCTION = Path("prompts/base_instruction.txt")
+
+GUI_SNIPPET = """
+import FreeCADGui
+FreeCADGui.activeDocument().activeView().viewAxometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+"""
+
+screenshot_code = """
+import FreeCADGui
+import time
+time.sleep(5)  # allow GUI to load
+view = FreeCADGui.ActiveDocument.ActiveView
+
+print("📸 Successfully ran FreeCAD script")
+"""
+
+MAX_RETRIES = 3  # Maximum auto-fix attempts
+# from sentence_transformers import SentenceTransformer, util
 # from dotenv import load_dotenv
 
 # 加载环境变量
@@ -593,19 +622,28 @@ class CADAssistantPanel(QtWidgets.QWidget):
 
             error_text += f"Error:\n{outer_err_str}"
             self.response_output.setPlainText(error_text)
+            
+            try: 
+                # Self-refinement pass
+                self.refine_with_error(
+                    client=client,
+                    failed_code=clean_code if 'clean_code' in locals() else "<no code extracted>",
+                    error_msg=outer_err_str,
+                    prompt=prompt,
+                    selected_text=selected_text,
+                    model_name=model_name,
+                    system_msg_base=system_msg,
+                    timestamp=timestamp,
+                    start_time=start_time
+                )
+                
+            except Exception as save_init_resp_ex:
+                # error_text += f"❌ Failed to save LLM response:\n\n{str(save_init_resp_ex)}"
+                
+                self.complexCAD(user_input = messages ,  model_name =model_name ,api_key =api_key, base_url =base_url)
 
-            # Self-refinement pass
-            self.refine_with_error(
-                client=client,
-                failed_code=clean_code if 'clean_code' in locals() else "<no code extracted>",
-                error_msg=outer_err_str,
-                prompt=prompt,
-                selected_text=selected_text,
-                model_name=model_name,
-                system_msg_base=system_msg,
-                timestamp=timestamp,
-                start_time=start_time
-            )
+
+
 
     def is_semantically_similar(self, a, b, threshold=0.8):
         a_norm, b_norm = a.strip(), b.strip()
@@ -638,6 +676,120 @@ class CADAssistantPanel(QtWidgets.QWidget):
             self.response_output.append(f"⚠️ Failed to read cache: {str(e)}")
 
         return None
+    
+    
+    def complexCAD(user_input , model_name ,api_key , base_url):
+        # user_input = input("Describe your FreeCAD part: ")
+
+        # Read base instructions
+        start_time = time.time()
+        base_instruction = BASE_INSTRUCTION.read_text().strip()
+        full_prompt = f"{base_instruction}\n\nUser instruction: {user_input}" + "\n\n**Output Format Guidelines**: The final generated FreeCAD Python macro must be between ```python and ```"
+
+        # Initial LLM generation
+        generated_code = prompt_llm(full_prompt , model_name , api_key ,base_url)
+
+        # # Clean code fences if any
+        # if generated_code.startswith("```"):
+        #     generated_code = generated_code.strip("`\n ")
+        #     if generated_code.lower().startswith("python"):
+        #         generated_code = generated_code[len("python"):].lstrip()
+                
+        matches = re.findall(r"```(?:python)?\s*(.*?)```", generated_code, re.DOTALL)
+        if matches:
+            generated_code = textwrap.dedent(max(matches, key=len)).strip()
+        else:
+            generated_code = textwrap.dedent(generated_code).strip()
+
+        # Append GUI snippet
+        generated_code += "\n\n" + GUI_SNIPPET + screenshot_code
+        
+        ast.parse(generated_code)
+        exec(generated_code, globals())
+        self.previous_code = generated_code
+        duration_sec = time.time() - start_time if start_time else -1
+        self.response_output.setPlainText(f"✅ Refinement succeeded  (completed in {duration_sec:.2f} seconds):\n\n{clean_code}")
+        self.confirm_button.setEnabled(True)  # Allow user to confirm refined macro
+        self.reject_button.setEnabled(True)   # Allow user to reject even refined macro if needed
+        
+
+        # Save initial script
+        GEN_SCRIPT.write_text(generated_code)
+        self.response_output.append(f"\n     Initial code written to {GEN_SCRIPT}")
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                start_time = time.time()
+                self.response_output.append(f"\n▶ Attempt {attempt} running FreeCAD...")
+                # success = run_freecad_script()
+                            # Attempt to parse and run
+
+                            # Read captured FreeCAD logs
+                error_logs = LOG_FILE.read_text() if LOG_FILE.exists() else "No log found."
+
+                # Prepare prompt for LLM to fix the code
+                fix_prompt = f"""
+        I want to make the following part using FreeCAD 1.0.1 python scripting
+
+        {user_input}
+
+        The following FreeCAD script was created but it failed during execution:
+
+        {generated_code}
+
+        Here is the error log:
+        {error_logs}
+
+        Please provide a corrected FreeCAD script. Keep the logic same, just correct the given error. Respond with valid FreeCAD 1.0.1 Python code only, no extra comments.
+        """ + + "\n\n**Output Format Guidelines**: The final generated FreeCAD Python macro must be between ```python and ```"
+                # Get fixed code from LLM
+                generated_code = prompt_llm(fix_prompt)
+
+                # Clean code fences if present
+                # if fixed_code.startswith("```"):
+                #     fixed_code = fixed_code.strip("`\n ")
+                #     if fixed_code.lower().startswith("python"):
+                #         fixed_code = fixed_code[len("python"):].lstrip()
+                
+                matches = re.findall(r"```(?:python)?\s*(.*?)```", generated_code, re.DOTALL)
+                if matches:
+                    generated_code = textwrap.dedent(max(matches, key=len)).strip()
+                else:
+                    generated_code = textwrap.dedent(generated_code).strip()
+
+                # Save fixed code for next attempt
+                generated_code = generated_code + "\n\n" + GUI_SNIPPET
+                
+                ast.parse(generated_code)
+                exec(generated_code, globals())
+                self.previous_code = generated_code
+                duration_sec = time.time() - start_time if start_time else -1
+                self.response_output.setPlainText(f"✅ Refinement succeeded at attempt {attempt} (completed in {duration_sec:.2f} seconds):\n\n{clean_code}")
+                self.confirm_button.setEnabled(True)  # Allow user to confirm refined macro
+                self.reject_button.setEnabled(True)   # Allow user to reject even refined macro if needed
+                
+
+                GEN_SCRIPT.write_text(generated_code)
+                self.response_output.append(f"     Fixed code written to {GEN_SCRIPT}. successfully...")
+                return 
+
+                # else:
+                #     print(f"❌ Max retries ({MAX_RETRIES}) reached. Check {LOG_FILE} for details.")
+                #     return False
+
+                      # Success! Exit the loop immediately
+            except Exception as e2:
+                error_msg = str(e2)
+                # failed_code = generated_code if 'clean_code' in locals() else "<no code extracted>"
+                self.response_output.append(f"⚠️ Attempt {attempt} failed. Retrying...\n")
+                QtCore.QCoreApplication.processEvents()
+
+                attempt += 1  # Next retry
+
+
+
+
+
 
     def refine_with_error(self, client, failed_code, error_msg, prompt, selected_text, model_name, system_msg_base, max_attempts=3, timestamp=None, start_time=None):
         attempt = 1

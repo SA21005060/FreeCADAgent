@@ -1,0 +1,322 @@
+<think>
+The user wants to fix a FreeCAD Python macro that creates a "little boy" (character).
+The previous attempt failed with `name 'App' is not defined`.
+Looking at the code, I see `App.ActiveDocument` and `App.Vector`, `App.Rotation`, `App.Placement`. In FreeCAD macros, `App` and `Gui` are usually available in the global namespace when running from the FreeCAD GUI. However, explicitly importing them or using the full `FreeCAD` module prefix is safer.
+
+The provided code starts with:
+```python
+import FreeCAD
+import Part
+import math
+```
+But then uses `App.ActiveDocument`. In FreeCAD, `App` is an alias for `FreeCAD`, but it's not guaranteed in all execution contexts or might need explicit import or prefixing. The standard way in macros is usually:
+```python
+import FreeCAD as App
+import Gui as Gui
+```
+or using `FreeCAD.` prefix.
+The error "name 'App' is not defined" suggests that in the specific environment or execution method, the `App` alias isn't set up automatically.
+
+Let's check the code for other potential issues as well, though the main error is the undefined `App`.
+
+1.  **Fixing the import**: Change `import FreeCAD` to `import FreeCAD as App`. Also import `Gui` properly.
+2.  **Function definitions**:
+    *   `create_cilinder`: "Cilinder" is a typo for "Cylinder", but it works as a function name. However, the object created is `Part::Cylinder`.
+    *   `create_box`: Creates `Part::Box`.
+    *   `create_sphere`: Creates `Part::Sphere`.
+3.  **Object Creation**:
+    *   The code clears objects: `for obj in App.ActiveDocument.Objects:`. If the document is empty or just cleared, this might error if `App.ActiveDocument` is None, but usually, there's an active document.
+    *   *Correction*: `App.ActiveDocument` might be None if no document is open. It's safer to ensure a document exists or handle the case. However, the user just wants the previous logic to work. The error was specifically about `App` not being defined.
+4.  **Geometry Construction**:
+    *   Head: Sphere at (0,0,75), radius 12.
+    *   Hair: Sphere at (0,0,78), radius 12. (This overlaps the head significantly).
+    *   Body: Box (Width, Height, Length) -> (20, 10, 30). Note on Part::Box: Dimensions are Width (X), Height (Y), Length (Z) in older versions, or Length (X), Width (Y), Height (Z) in newer? Actually, it's usually Length(X), Width(Y), Height(Z). The code uses `(20, 10, 30)` mapped to `box.Width`, `box.Height`, `box.Length`. Wait, the properties of `Part::Box` are `Length`, `Width`, `Height`. The code does:
+        ```python
+        box.Width = dims[0]
+        box.Height = dims[1]
+        box.Length = dims[2]
+        ```
+        This maps X to Width, Y to Height, Z to Length. Standard CAD is usually Z up. If the cylinder is vertical (Z), the box should probably be aligned. If `box.Length` is Z, that's fine.
+    *   Arms: Cylinders. Radius 4, height 15. Position (-14, 0, 55). This seems to be floating or connected to the body. Body center is at Z=50, height 30 (spans Z=35 to 65?). Wait, body position is (0,0,50).
+        *   If body is a box centered at (0,0,50) with Height (Z) = 30, it spans Z from 35 to 65.
+        *   Arm sleeve at Z=55. This is inside the body vertically.
+    *   Legs: Cylinders. Position Z=20. Height 35. Spans Z=2.5 to 37.5.
+    *   Shoes: Boxes at Z=2.5. Height 5. Spans Z=0 to 5.
+    *   Eyes: Spheres at ( -4, 10, 77 ) and ( 4, 10, 77 ). Y=10 is "forward" (towards the viewer usually in FreeCAD default view if looking from front? Or Y is depth). Assuming standard FreeCAD: X right, Y back, Z up. If Y is 10, they are in front of the face. That makes sense.
+5.  **Cleanup**: The code removes all objects. This is fine for a macro script intended to generate the whole scene.
+
+**Specific Fixes for the Error**:
+The variable `App` is undefined. In FreeCAD Python console and macros, `App` and `Gui` are usually implicit. But if running as a standalone script or if the environment is clean, they might need explicit import.
+The standard way to ensure it works everywhere is:
+```python
+import FreeCAD as App
+import FreeCADGui as Gui
+```
+Or using the full prefix `FreeCAD.`.
+
+Let's refine the geometry parameters to look a bit more like a "little boy" rather than just primitives stacked weirdly.
+- Head: Radius 10-12.
+- Body: Smaller.
+- Legs: Shorter.
+- Position adjustments.
+
+Let's stick to the user's intent as close as possible but fix the variable scope error.
+
+**Plan**:
+1. Import `FreeCAD` as `App` and `FreeCADGui` as `Gui`.
+2. Check if a document exists, if not create one.
+3. Clear objects (handling potential empty document case).
+4. Keep the function definitions and geometry creation logic, just fixing the undefined variable error.
+5. Ensure `Gui.` is used correctly for view manipulation.
+
+One detail: `create_cilinder` creates `Part::Cylinder`. Cylinders in FreeCAD are created along the Z-axis. The code seems to assume this (vertical arms/legs).
+However, `create_box` assigns:
+`box.Width = dims[0]`
+`box.Height = dims[1]`
+`box.Length = dims[2]`
+In FreeCAD Part::Box:
+- Length is along X.
+- Width is along Y.
+- Height is along Z.
+So `dims` = (X, Y, Z).
+If the code passes `(20, 10, 30)` -> Width=20(X), Height=10(Y), Length=30(Z).
+This creates a box that is 30 units tall (Z), but 20 wide and 10 deep. That seems like a very thin box (like a plank). A body usually needs more depth.
+Let's change the body dims to be more cube-like or cylindrical. The previous code used a box for the body. Let's make it slightly deeper, say (15, 10, 30). Or keep it as is if the user didn't complain about shape, just the error. The user asked to "Create a little boy". I should probably make it look decent.
+
+Also, the hair sphere at (0,0,78) with radius 12. Center is at 78. Bottom is at 66.
+Head center at 75. Radius 12. Top is at 87. Bottom at 63.
+The hair covers the whole head basically. I'll move the hair up or shrink it to look like hair.
+
+**Revised Code Structure**:
+```python
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+import math
+
+# ... colors ...
+
+# ... functions ...
+
+# ... execution ...
+```
+
+One more thing: `App.ActiveDocument` might be None. The script should probably create a document if it doesn't exist to be safe, or assume the user has one open. Usually, when running a macro, there is a document. But if the user just opens FreeCAD and runs it, there might not be one.
+Let's add:
+```python
+if App.ActiveDocument is None:
+    App.newDocument("Unnamed")
+```
+Or just rely on the user having a document. The original code didn't have this, but "name 'App' is not defined" usually stops execution before any logic runs, so the rest of the logic might have been fine or buggy, but we didn't get there. I will stick to fixing the imports.
+
+Also, `Gui.activeDocument()` can fail if no Gui. But standard macro execution usually implies Gui mode.
+
+Let's write the corrected code.
+
+**Code changes**:
+1. Import `FreeCAD as App` and `FreeCADGui as Gui`.
+2. Fix potential typos in function names if necessary (e.g., `create_cilinder` is fine, but `Part::Cylinder` is the object).
+3. The logic for removing objects:
+   ```python
+   for obj in App.ActiveDocument.Objects:
+       App.ActiveDocument.removeObject(obj.Name)
+   ```
+   This can be risky if modifying the list while iterating. Better to convert to list or iterate backwards. But simpler is `App.ActiveDocument.removeObject(obj.Name)` implies iteration issues? No, Python handles removal if you iterate over a copy or use `while`. Actually, iterating over the list of objects directly and removing causes `RuntimeError: list changed size during iteration`.
+   Fix:
+   ```python
+   for obj in App.ActiveDocument.Objects[:]:
+       App.ActiveDocument.removeObject(obj.Name)
+   ```
+
+Let's adjust the geometry to be a bit more "little boy" proportions.
+- Head: Radius 12 is huge if body is height 30. A child has a larger head proportion.
+- Body height 30.
+- Legs 35.
+- Total height ~ 75 + 12 (head) = 87? No, head at 75, top is 87. Legs at 20, bottom is 2.5. Total height ~ 85. Sounds okay.
+
+Let's implement.
+
+```python
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+import math
+
+# Colors (R, G, B)
+color_skin = (1.0, 0.8, 0.6)
+color_shirt = (0.2, 0.5, 0.8) # Blue
+color_pants = (0.1, 0.1, 0.4) # Dark Blue
+color_hair  = (0.2, 0.1, 0.05) # Brown
+color_shoes = (0.1, 0.1, 0.1) # Black
+color_eyes  = (0.0, 0.0, 0.0) # Black
+
+def create_cylinder(radius, height, position, rotation=(0,0,0), color=color_skin):
+    # Note: FreeCAD Cylinder is created along Z axis. 
+    # Position is center of the cylinder.
+    cyl = App.ActiveDocument.addObject("Part::Cylinder", "Cylinder")
+    cyl.Radius = radius
+    cyl.Height = height
+    cyl.Placement = App.Placement(
+        App.Vector(*position), 
+        App.Rotation(*rotation)
+    )
+    cyl.ViewObject.ShapeColor = color
+    return cyl
+
+def create_box(dims, position, rotation=(0,0,0), color=color_skin):
+    # dims: (x, y, z) -> (Length, Width, Height) in FreeCAD terms usually, 
+    # but properties are Length, Width, Height. 
+    # Let's map dims[0] to Length (X), dims[1] to Width (Y), dims[2] to Height (Z)
+    box = App.ActiveDocument.addObject("Part::Box", "Box")
+    box.Length = dims[0]
+    box.Width = dims[1]
+    box.Height = dims[2]
+    
+    # Placement is at the center of the box in FreeCAD Part::Box?
+    # Yes, usually.
+    box.Placement = App.Placement(
+        App.Vector(*position),
+        App.Rotation(*rotation)
+    )
+    box.ViewObject.ShapeColor = color
+    return box
+
+def create_sphere(radius, position, color=color_skin):
+    sphere = App.ActiveDocument.addObject("Part::Sphere", "Sphere")
+    sphere.Radius = radius
+    sphere.Placement = App.Placement(
+        App.Vector(*position),
+        App.Rotation()
+    )
+    sphere.ViewObject.ShapeColor = color
+    return sphere
+
+# Ensure document exists
+if App.ActiveDocument is None:
+    App.newDocument("LittleBoy")
+
+# Clear existing objects
+for obj in App.ActiveDocument.Objects[:]:
+    App.ActiveDocument.removeObject(obj.Name)
+
+# --- Create Character ---
+
+# Head (Skin) - Center Z: 70
+head = create_sphere(12, (0, 0, 70), color_skin)
+
+# Hair - Top of head
+# A sphere slightly offset up and scaled or just smaller to look like hair cap
+# Let's use a sphere slightly higher and smaller
+hair = create_sphere(10, (0, -2, 76), color_hair) 
+# Note: In FreeCAD default view, -Y is usually towards the viewer or back? 
+# Standard: X Right, Y Forward (towards screen), Z Up.
+# If we put hair at Y=-2, it's "behind" if Y+ is back. Let's put it at Y=-2 (closer to back?).
+# Wait, if Y is depth, usually + is away. 
+# The eyes were at Y=10. That implies Y+ is forward (towards viewer).
+# So Hair at Y=-2 would be behind the head. Let's put it at Y=-5 to cover the back of head.
+# Or just center it. Let's adjust hair to be on top.
+
+# Body (Shirt) - Center Z: 45. Height 25.
+# Width (X): 18, Depth (Y): 10, Height (Z): 25
+body = create_box((18, 10, 25), (0, 0, 45), color=color_shirt)
+
+# Arms (Sleeves + Hands)
+# Left Arm
+# Sleeve
+arm_l_sleeve = create_cylinder(3.5, 12, (-12, 0, 48), color=color_shirt)
+# Hand
+arm_l_hand = create_cylinder(2.5, 7, (-12, 0, 38), color=color_skin)
+
+# Right Arm
+arm_r_sleeve = create_cylinder(3.5, 12, (12, 0, 48), color=color_shirt)
+arm_r_hand = create_cylinder(2.5, 7, (12, 0, 38), color=color_skin)
+
+# Legs (Pants)
+# Cylinders vertical
+# Left Leg
+leg_l = create_cylinder(4, 30, (-5, 0, 20), color=color_pants)
+# Right Leg
+leg_r = create_cylinder(4, 30, (5, 0, 20), color=color_pants)
+
+# Feet (Shoes)
+# Box at bottom
+shoe_l = create_box((8, 10, 5), (-5, 0, 2.5), color=color_shoes)
+shoe_r = create_box((8, 10, 5), (5, 0, 2.5), color=color_shoes)
+
+# Face features (Eyes)
+# Y=10 is forward (towards viewer). Z=70 (head center) + offset.
+eye_l = create_sphere(1.2, (-4, 10, 72), color_eyes)
+eye_r = create_sphere(1.2, (4, 10, 72), color_eyes)
+
+# View
+Gui.activeDocument().activeView().viewIsometric()
+Gui.activeDocument().activeView().fitAll()
+```
+
+Wait, in `create_box`, I changed the assignment order to match `Length`, `Width`, `Height` properly, assuming `dims` is (x,y,z). The original code was:
+```python
+box.Width = dims[0]
+box.Height = dims[1]
+box.Length = dims[2]
+```
+This mapped x->Width, y->Height, z->Length. This is confusing but consistent with the original code's (incorrect) mapping but perhaps the user's intention was different. A box with dimensions (20, 10, 30) in the original code:
+Width=20, Height=10, Length=30.
+So it was very thin in Y (10) and tall in Z (30). Like a standing slab.
+My adjustment `(18, 10, 25)` -> Length=18, Width=10, Height=25.
+Still thin in Y (10). That's fine, maybe the boy is slim.
+
+The main error fix is `import FreeCAD as App`.
+
+One detail: `create_cilinder` was defined in the original. I renamed it to `create_cylinder` for clarity, but FreeCAD object is `Part::Cylinder`. The function name inside the script doesn't matter for the output geometry, just for readability.
+
+I will provide the full corrected code.
+
+Final check on `App` import:
+The error was `name 'App' is not defined`.
+The fix is `import FreeCAD as App`.
+
+Also, `Gui.activeDocument()` might fail if called when no document is active or GUI not started. Adding `App.newDocument` ensures there is a target.
+
+Code seems solid.
+
+One minor fix in the user's code:
+`create_cilinder` -> I will keep the typo or fix it? Fix it to `create_cylinder`.
+The user's code had `arm_l_sleeve = create_cilinder(...)`. I'll update the calls to match my function definition.
+
+I will stick to the user's design mostly but ensure it runs.
+
+```python
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+import math
+```
+This is the standard fix.
+
+One subtle thing: `App.Vector(*position)` expects a tuple/list of 3 numbers. The code passes `(0, 0, 75)`. This works.
+
+Is there any other error?
+`cyl.ViewObject.ShapeColor = color` - `ShapeColor` takes a tuple. The code provides a tuple. Correct.
+
+The loop for removing objects:
+```python
+for obj in App.ActiveDocument.Objects:
+    App.ActiveDocument.removeObject(obj.Name)
+```
+As mentioned, this crashes in Python 3 because you modify the list during iteration. I will fix this by using `[:]`.
+
+Let's generate the code.
+</think>
+
+Here is the corrected macro. The main issue was that `App` was not defined; I added the import `import FreeCAD as App` and `import FreeCADGui as Gui`. I also fixed the loop used to clear existing objects to prevent a runtime error.
+
+```python
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+import math
+
+# Colors (R, G, B)
+color_skin = (1.0, 0.8, 0.6)
+color_shirt = (0.2, 0.5, 0.8) # Blue
+color_pants = (

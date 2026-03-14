@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/user/aProgram/CAD/FreeCADAgent-main/whisper_server.py", line 2, in <module>
+    import sounddevice as sd
+ModuleNotFoundError: No module named 'sounddevice'

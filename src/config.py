@@ -10,16 +10,38 @@ from dotenv import load_dotenv
 # 首先尝试加载当前目录的.env
 load_dotenv()
 
+# # 然后尝试加载Agents的.env(如果存在)
+# Agents_env = "/home/user/PyCharmMiscProject/Agent/Agents-main"#/hello_agents Path(__file__).parent.parent.parent.parent / "Agents" / ".env"
+# if Agents_env.exists():
+#     load_dotenv(Agents_env, override=False)  # 不覆盖已有的环境变量
 
 
 class Settings(BaseSettings):
     """应用配置"""
 
+    # # 应用基本配置
+    # app_name: str = "Agents智能旅行助手"
+    # app_version: str = "1.0.0"
+    # debug: bool = False
+
+    # # 服务器配置
+    # host: str = "0.0.0.0"
+    # port: int = 8000
+
+    # # CORS配置 - 使用字符串,在代码中分割
+    # cors_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+
+    # # 高德地图API配置
+    # amap_api_key: str = ""
+
+    # # Unsplash API配置
+    # unsplash_access_key: str = ""
+    # unsplash_secret_key: str = ""
 
     # LLM配置 (从环境变量读取,由Agents管理)
-    openai_api_key: str = "ollama"
-    openai_base_url: str = "http://localhost:11434/v1"
-    openai_model: str = "qwen3.5"
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4"
 
     # 日志配置
     log_level: str = "INFO"
@@ -29,6 +51,9 @@ class Settings(BaseSettings):
         case_sensitive = False
         extra = "ignore"  # 忽略额外的环境变量
 
+    # def get_cors_origins_list(self) -> List[str]:
+    #     """获取CORS origins列表"""
+    #     return [origin.strip() for origin in self.cors_origins.split(',')]
 
 
 # 创建全局配置实例
@@ -46,6 +71,8 @@ def validate_config():
     errors = []
     warnings = []
 
+    if not settings.amap_api_key:
+        errors.append("AMAP_API_KEY未配置")
 
     # AgentsLLM会自动从LLM_API_KEY读取,不强制要求OPENAI_API_KEY
     llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")

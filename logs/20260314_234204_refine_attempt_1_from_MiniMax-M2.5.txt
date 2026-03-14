@@ -1,0 +1,303 @@
+<think>
+The user wants to fix a FreeCAD Python macro that creates an airplane model.
+The previous attempt failed with the error: `function takes at least 3 arguments (2 given)`.
+
+Let's analyze the provided code.
+
+The error occurs in the context of `FreeCAD.Rotation`. In FreeCAD Python API:
+- `FreeCAD.Rotation()` can take various arguments.
+- `FreeCAD.Rotation(FreeCAD.Vector, angle)` is a valid constructor.
+- `FreeCAD.Rotation(x, y, z, angle)` (axis-angle) is valid.
+- `FreeCAD.Rotation(x, y, z)` (Euler angles) is valid.
+
+Looking at the specific lines in the code:
+
+```python
+    # 旋转圆柱体使其沿X轴放置
+    body.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+```
+`FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)`:
+The FreeCAD C++ API usually takes an axis (Vector) and an angle (float degrees). However, looking at the Python binding for `Rotation`, the constructor `Rotation(Vector, float)` usually expects `Vector, float` or `x, y, z, angle`.
+Wait, let's check `FreeCAD.Rotation`.
+In FreeCAD, `Rotation` can be initialized with axis and angle like this: `FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)`. This seems correct in principle.
+However, sometimes the Python bindings might be finicky, or the error message "function takes at least 3 arguments (2 given)" suggests it's interpreting the arguments differently.
+
+Let's look at other lines using Rotation:
+```python
+    nose.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(fuselage_length/2 + nose_length/2, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+```
+
+```python
+    wing.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, 0, -wing_chord/2 + 0.2), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+```
+
+```python
+    vtail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+```
+
+```python
+    htail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, 0.5), 
+        FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), 0)
+    )
+```
+
+```python
+    # 左引擎
+    eng_l.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, wing_span/4, -0.8), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+```
+
+The error message `function takes at least 3 arguments (2 given)` usually happens in FreeCAD when calling `FreeCAD.Vector()` without enough arguments if used in a context expecting a specific type, but here it's `FreeCAD.Rotation`.
+
+Let's check `FreeCAD.Rotation` docs or typical usage in Python macros.
+Often, people use `FreeCAD.Rotation(x, y, z, angle)` for axis-angle.
+Or `FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), math.radians(90))`. Note: `Rotation` usually expects degrees? Yes, degrees in standard constructors.
+But wait, the error message "function takes at least 3 arguments (2 given)" on `FreeCAD.Rotation` might mean it's trying to call a constructor that takes Quaternion (4 floats) or Euler (3 floats).
+
+Let's verify the specific constructor `FreeCAD.Rotation(Vector, float)`.
+In FreeCAD 0.18/0.19, `Rotation(Vector, float)` is the Axis-Angle constructor.
+Is it possible the Vector is being interpreted incorrectly?
+Actually, the specific error "function takes at least 3 arguments (2 given)" strongly suggests the Python interpreter thinks `FreeCAD.Rotation` is being called with the wrong signature or the module isn't imported correctly (though `Part` and `FreeCAD` are imported).
+
+However, looking at the code, the logic seems standard.
+Wait, maybe the error comes from `makeCylinder` or `makeBox`?
+`Part.makeCylinder` arguments: `radius, height, center, axis, angle`. (radius, height, [pos], [axis], [angle]).
+The error "function takes at least 3 arguments (2 given)" fits `FreeCAD.Rotation` if the Python binding doesn't support `(Vector, float)` directly or interprets `(Vector, float)` differently.
+
+Let's look at `FreeCAD.Rotation` documentation or common workarounds.
+Common usage: `rot = FreeCAD.Rotation(0, 0, 1, 90)` (x, y, z, angle).
+Or `rot = FreeCAD.Rotation(FreeCAD.Vector(0,0,1), 90)`.
+
+If the error persists, it's possible the Vector object is not being passed correctly as the first argument.
+But let's look at the line numbers in the traceback (not provided, but let's assume it's the Rotation lines).
+
+Alternative: The error might be in `doc.addObject`.
+`doc.addObject("Part::Feature", "Fuselage")` -> returns an object.
+`fuselage_obj.Shape = fuselage_shape`.
+
+Let's re-read the error: `function takes at least 3 arguments (2 given)`.
+This sounds like a function expecting 3 args but got 2.
+Is there any function call with 2 args that expects 3?
+`FreeCAD.Rotation(a, b)` might be the culprit if the binding requires `x, y, z, angle`.
+If `a` is a Vector, it might fail if the Vector is not unpacked or if the signature changed.
+
+Let's look at the imports. `import FreeCAD`. `FreeCAD.Rotation` is available.
+In some versions, `FreeCAD.Rotation` signature is `(x, y, z, angle)`.
+So `FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)` might fail because it sees a Vector object and a Number, and thinks "This isn't the (x,y,z,angle) signature".
+Does it support `(Vector, float)`?
+Checking standard FreeCAD python scripts: `FreeCAD.Rotation(FreeCAD.Vector(0,1,0), 1.57)` is common.
+
+Wait, I might be misinterpreting the error. "function takes at least 3 arguments (2 given)".
+This implies the function was called with 2 args, but it needs at least 3.
+Which function? It must be inside the function call chain. Since it's a macro, maybe it's `Placement`.
+`FreeCAD.Placement(Vector, Rotation)` -> 2 args.
+Is `FreeCAD.Placement` the function?
+`FreeCAD.Placement` requires `(Pos, Rot)`. That is 2 arguments. If it requires 3, it might be `(x, y, z, quaternion)`. But `(Vector, Rotation)` is standard.
+
+Maybe the error is inside `Part.makeCylinder`? No, usually has defaults.
+
+Let's look closely at `FreeCAD.Vector(0, 1, 0)`.
+If `FreeCAD` is not initialized properly, `Vector` might behave weirdly, but that's unlikely.
+
+Let's assume the specific `FreeCAD.Rotation` constructor `(Vector, angle)` is the issue in the user's environment (maybe older FreeCAD version or specific binding quirk).
+A safer way to define rotation is:
+`rot = FreeCAD.Rotation()`
+`rot.setValue(FreeCAD.Vector(0,1,0), 90)` -> This takes 2 args. Wait, `setValue` takes `(Vector, float)`.
+If `Rotation(...)` fails, maybe use `setValue`.
+
+But let's look at the error message "function takes at least 3 arguments (2 given)".
+This implies the function definition expects >=3 args.
+`def Rotation(x, y, z=None, angle=None):` ...
+If I call `Rotation(vec, angle)`, Python might try to match `x=vec, y=angle`, leaving `z` and `angle` missing if `angle` is a keyword or if the logic expects x,y,z separate?
+Actually, `FreeCAD.Rotation` is a wrapper around `Rotation`.
+If I use `FreeCAD.Rotation(0, 0, 1, 90)` (4 args), it works.
+If I use `FreeCAD.Rotation(FreeCAD.Vector(0,0,1), 90)` (2 args), does it work? It should.
+
+Let's check the exact error location in the provided code.
+The code provided is:
+```python
+    body.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)
+    )
+```
+If `FreeCAD.Rotation` is the problem.
+Let's try changing it to the Euler angle format or explicit 4 arguments to be safe, or using `setValue`.
+`FreeCAD.Rotation(x, y, z, angle)` takes 4 arguments.
+The error says "takes at least 3 arguments (2 given)".
+So it thinks I passed 2.
+So it thinks the function is `Rotation(x, y, z)`.
+If I pass `(Vector, float)`, it maps to `(x=Vector, y=float)`. That's 2 args.
+And if the C++ binding expects `(x,y,z,w)` or `(x,y,z,angle)` (4 args), then 2 is not enough.
+
+Fix: Use `FreeCAD.Rotation(x, y, z, angle)` format.
+e.g. `FreeCAD.Rotation(0, 1, 0, 90)`.
+Or use `FreeCAD.Rotation()` and then `.setValue(...)`.
+
+Let's fix the Rotation calls.
+Instead of `FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)`, use `FreeCAD.Rotation(0, 1, 0, 90)`.
+Also `FreeCAD.Rotation(1, 0, 0, 0)` etc.
+
+Check `FreeCAD.Placement` args. `(Vector, Rotation)`. That's 2. Should be fine.
+
+Let's double check `Part.makeCylinder`.
+`Part.makeCylinder(radius, height, [pnt, axis, angle])`.
+Radius and height are required.
+`Part.makeCylinder(fuselage_radius, fuselage_length)` -> 2 args. OK.
+
+Let's fix the Rotation constructors in the code.
+
+Plan:
+1. Replace `FreeCAD.Rotation(FreeCAD.Vector(a, b, c), angle)` with `FreeCAD.Rotation(a, b, c, angle)`.
+2. Also check if `FreeCAD.Vector` is correct. Yes.
+3. Check `viewIsometric`. In some versions it's `viewIsometric()`, in others `activeView().viewIsometric()`. The code uses `FreeCAD.Gui.activeDocument().activeView().viewIsometric()`. This is correct for older versions. In newer (1.0), it might differ, but let's stick to standard compatibility.
+
+Wait, let's look at the specific error again.
+"function takes at least 3 arguments (2 given)"
+This is very specific. It means `Rotation` expects 3 args but got 2.
+So changing to 4 args will fix it.
+
+Also, the `makeBox` dimensions: `makeBox(x, y, z)`.
+The code uses: `Part.makeBox(wing_span, wing_thick, wing_chord)`.
+`wing_span = 14.0`, `wing_thick = 0.3`, `wing_chord = 2.5`. Correct.
+
+One detail: `body.fuse(nose)`.
+This returns a Shape. `Part.Shape` has `fuse`.
+`fuselage_shape = body.fuse(nose)`.
+This works.
+
+Let's rewrite the macro with corrected Rotation calls.
+
+```python
+import FreeCAD
+import Part
+import math
+import Draft
+
+def create_airplane():
+    # 获取当前活动文档，如果不存在则创建一个新的
+    doc = FreeCAD.ActiveDocument
+    if not doc:
+        doc = FreeCAD.newDocument()
+
+    # --- 1. 创建机身 (Fuselage) ---
+    # 机身主体 (圆柱体)
+    fuselage_length = 12
+    fuselage_radius = 1.0
+    body = Part.makeCylinder(fuselage_radius, fuselage_length)
+    # 旋转圆柱体使其沿X轴放置
+    # Fix: Use 4 arguments for Rotation: x, y, z, angle
+    body.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 0), 
+        FreeCAD.Rotation(0, 1, 0, 90)
+    )
+
+    # 机头 (圆锥体)
+    nose_length = 3.0
+    # makeCone (radius, height, [pnt, axis, angle])
+    # Note: makeCone might take (radius1, radius2, height ...)
+    # For a cone: radius at base, radius at top (0), height.
+    # In the original code: Part.makeCone(fuselage_radius, nose_length).
+    # makeCone(radius, height) -> this creates a cone with radius at base and 0 at top?
+    # Actually Part.makeCone has several overloads.
+    # makeCone (radius1, radius2, height [pnt, axis, angle])
+    # radius1: base radius, radius2: top radius.
+    # If we want a nose cone, we usually want base at fuselage, point at front.
+    # Original code: makeCone(radius, height). In FreeCAD Python API, usually makeCone(radius, height) is NOT standard. 
+    # It's makeCone(radius1, radius2, height). 
+    # However, the original code provided used makeCone(fuselage_radius, nose_length).
+    # If this is valid in the user's version, fine. But likely it's (r1, r2, h).
+    # Let's assume (r1, r2, h) = (fuselage_radius, 0, nose_length) or (0, fuselage_radius, nose_length)?
+    # A nose cone starts at fuselage_radius and goes to 0.
+    # So makeCone(fuselage_radius, 0, nose_length).
+    # Let's check original code: Part.makeCone(fuselage_radius, nose_length).
+    # This might fail if it's not a valid signature or just makes a weird shape.
+    # Standard is makeCone(radius1, radius2, height).
+    # Let's fix it to be safe: makeCone(fuselage_radius, 0, nose_length).
+    
+    nose = Part.makeCone(fuselage_radius, 0, nose_length)
+    # 旋转并移动到机身前端
+    # Original code had: Vector(fuselage_length/2 + nose_length/2, 0, 0)
+    # Rotation: 0, 1, 0, 90
+    nose.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(fuselage_length/2 + nose_length/2, 0, 0), 
+        FreeCAD.Rotation(0, 1, 0, 90)
+    )
+
+    # 合并机身和机头
+    fuselage_shape = body.fuse(nose)
+    fuselage_obj = doc.addObject("Part::Feature", "Fuselage")
+    fuselage_obj.Shape = fuselage_shape
+    fuselage_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8) # 灰色
+
+    # --- 2. 创建主翼 (Main Wings) ---
+    wing_span = 14.0
+    wing_chord = 2.5
+    wing_thick = 0.3
+
+    # makeBox(x, y, z)
+    wing = Part.makeBox(wing_span, wing_thick, wing_chord)
+    # Original: Vector(1, 0, -wing_chord/2 + 0.2)
+    wing.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, 0, -wing_chord/2 + 0.2), 
+        FreeCAD.Rotation(1, 0, 0, 0) # Fix: 4 args
+    )
+
+    wing_obj = doc.addObject("Part::Feature", "MainWing")
+    wing_obj.Shape = wing
+    wing_obj.ViewObject.ShapeColor = (0.2, 0.6, 0.9)
+
+    # --- 3. 创建尾翼 (Tail) ---
+    # 垂直尾翼
+    vtail_height = 3.5
+    vtail_chord = 1.5
+    # makeBox(width, height, length) -> standard? Or x, y, z.
+    # The code used: makeBox(1, 0.2, vtail_height). This seems like x=1, y=0.2, z=vtail_height.
+    vtail = Part.makeBox(1, 0.2, vtail_height)
+    vtail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, vtail_height/2 + 0.5), 
+        FreeCAD.Rotation(1, 0, 0, 0)
+    )
+
+    vtail_obj = doc.addObject("Part::Feature", "VerticalTail")
+    vtail_obj.Shape = vtail
+    vtail_obj.ViewObject.ShapeColor = (0.8, 0.2, 0.2)
+
+    # 水平尾翼
+    htail_span = 5.0
+    htail_chord = 1.2
+    htail = Part.makeBox(htail_span, 0.2, htail_chord)
+    htail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(-fuselage_length/2 + 1, 0, 0.5), 
+        FreeCAD.Rotation(1, 0, 0, 0)
+    )
+
+    htail_obj = doc.addObject("Part::Feature", "HorizontalTail")
+    htail_obj.Shape = htail
+    htail_obj.ViewObject.ShapeColor = (0.8, 0.8, 0.8)
+
+    # --- 4. 创建引擎 (Engines) ---
+    engine_radius = 0.4
+    engine_length = 3.0
+
+    # 左引擎
+    eng_l = Part.makeCylinder(engine_radius, engine_length)
+    eng_l.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(1, wing_span/4, -0.8), 
+        FreeCAD.Rotation
+</think>
