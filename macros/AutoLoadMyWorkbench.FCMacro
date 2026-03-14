@@ -1,0 +1,28 @@
+
+# 打开AutoLoadMyWorkbench.FCMacro文件，在最顶部添加以下代码
+import sys
+# 替换为上一步查到的路径（到site-packages层级，不是openai子目录）
+openai_path = "/home/user/.local/lib/python3.10/site-packages"
+if openai_path not in sys.path:
+    sys.path.append(openai_path)
+
+import os, sys
+
+
+# Path to the macros folder (where this macro lives)
+macro_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Go up one level → project root (where InitGui.py and FreeCADAgent.py live)
+project_dir = os.path.dirname(macro_dir)
+
+# Ensure project root is on sys.path
+if project_dir not in sys.path:
+    sys.path.insert(0, project_dir)
+
+# Path to InitGui.py
+init_gui_path = os.path.join(project_dir, "InitGui.py")
+
+with open(init_gui_path, "r", encoding="utf-8") as f:
+    exec(f.read(), globals())
+
+print(f"🔄 Loaded InitGui.py from {init_gui_path}")

@@ -1,0 +1,12 @@
+{
+  "qwen3.5": {
+    "api_version": "your-azure-api-version",
+    "api_key": "your-azure-api-key",
+    "azure_endpoint": "http://localhost:11434/v1"
+  },
+  "lfm2.5-thinking": {
+    "api_version": "your-azure-api-version",
+    "api_key": "your-azure-api-key",
+    "azure_endpoint": "http://localhost:11434/v1"
+  }
+}

@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+sounddevice
+soundfile
+
+torch
+requests
+sentence-transformers
+dotenv
