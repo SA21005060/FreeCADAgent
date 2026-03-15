@@ -1,0 +1,161 @@
+<think>
+The user wants a FreeCAD Python macro to create a box.
+The previous macro failed with the error: `'NoneType' object has no attribute 'addObject'`.
+This error usually happens when `FreeCAD.ActiveDocument` is `None`, meaning there is no active document open in FreeCAD.
+
+**Plan:**
+1.  Check if an ActiveDocument exists. If not, create a new one.
+2.  Define the dimensions for the box (length, width, height).
+3.  Create the box object using `Part::Box`.
+4.  Set the dimensions.
+5.  Recompute the document.
+6.  Set the view to isometric.
+7.  Fit the view to show the object.
+
+**Code Structure:**
+```python
+import FreeCAD
+import FreeCADGui
+
+# 1. 确保存在活动文档
+if FreeCAD.ActiveDocument is None:
+    FreeCAD.newDocument()
+
+# 2. 定义尺寸
+length = 50
+width = 30
+height = 20
+
+# 3. 创建长方体
+box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyBox")
+box.Length = length
+box.Width = width
+box.Height = height
+
+# 4. 更新
+FreeCAD.ActiveDocument.recompute()
+
+# 5. 视图设置
+view = FreeCADGui.ActiveDocument.ActiveView
+view.viewIsometric()
+view.fitAll()
+
+print("Box created: {} x {} x {}".format(length, width, height))
+```
+
+I will refine this code to ensure it handles the "No Active Document" case properly.
+
+Let's verify the specific error: `'NoneType' object has no attribute 'addObject'`.
+This confirms `FreeCAD.ActiveDocument` was `None`.
+The solution is to add `FreeCAD.newDocument()` if `FreeCAD.ActiveDocument` is `None`.
+
+Let's write the final code.
+
+```python
+import FreeCAD
+import FreeCADGui
+
+# ==========================================
+# 1. 检查并创建活动文档
+# ==========================================
+if FreeCAD.ActiveDocument is None:
+    FreeCAD.newDocument()
+
+# ==========================================
+# 2. 定义长方体的尺寸 (单位：mm)
+# ==========================================
+length = 50  # 长度 (X轴方向)
+width = 30   # 宽度 (Y轴方向)
+height = 20  # 高度 (Z轴方向)
+
+# ==========================================
+# 3. 创建长方体对象
+# ==========================================
+box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyBox")
+box.Length = length
+box.Width = width
+box.Height = height
+
+# 确保属性设置后几何体正确生成
+FreeCAD.ActiveDocument.recompute()
+
+# ==========================================
+# 4. 设置视图并适应屏幕
+# ==========================================
+view = FreeCADGui.ActiveDocument.ActiveView
+
+# 设置为等轴测视图 (Isometric View)
+view.viewIsometric()
+
+# 自动缩放视图以完全显示创建的物体
+view.fitAll()
+
+print("长方体已创建，尺寸: {} x {} x {}".format(length, width, height))
+```
+
+This looks correct and addresses the specific error encountered.
+
+One minor check: `view` could potentially be None if the Gui is not active, but usually, in a macro context running in the GUI, it exists. The error was strictly about the Document.
+
+Final check on syntax.
+`FreeCAD.newDocument()` returns the new document, but usually, it also sets it as ActiveDocument. However, explicitly relying on `FreeCAD.ActiveDocument` afterwards is safer.
+
+The error message `'NoneType' object has no attribute 'addObject'` strictly means `FreeCAD.ActiveDocument` was None.
+Fix: Add `FreeCAD.newDocument()`.
+
+I will generate the code now.
+</think>
+
+这是一个修复后的 FreeCAD Python 宏。
+
+**错误分析：**
+之前的代码报错 `'NoneType' object has no attribute 'addObject'`，这是因为在运行代码时 FreeCAD 中没有打开任何文档（`FreeCAD.ActiveDocument` 为 `None`），因此无法向其中添加对象。
+
+**解决方案：**
+在创建长方体之前，添加一段检查代码。如果当前没有活动文档，则自动创建一个新文档。
+
+**修复后的代码如下：**
+
+```python
+import FreeCAD
+import FreeCADGui
+
+# ==========================================
+# 1. 检查并创建活动文档 (修复 NoneType 错误)
+# ==========================================
+if FreeCAD.ActiveDocument is None:
+    FreeCAD.newDocument()
+
+# ==========================================
+# 2. 定义长方体的尺寸 (单位：mm)
+# ==========================================
+length = 50  # 长度 (X轴方向)
+width = 30   # 宽度 (Y轴方向)
+height = 20  # 高度 (Z轴方向)
+
+# ==========================================
+# 3. 创建长方体对象
+# ==========================================
+# 使用 Part 工作台的几何体功能创建 Box
+box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyBox")
+box.Length = length
+box.Width = width
+box.Height = height
+
+# 确保属性设置后几何体正确生成
+FreeCAD.ActiveDocument.recompute()
+
+# ==========================================
+# 4. 设置视图并适应屏幕
+# ==========================================
+# 获取当前视图对象
+view = FreeCADGui.ActiveDocument.ActiveView
+
+# 设置为等轴测视图 (Isometric View)
+view.viewIsometric()
+
+# 自动缩放视图以完全显示创建的物体
+view.fitAll()
+
+print("长方体已创建，尺寸: {} x {} x {}".format(length, width, height))
+```

@@ -1,0 +1,69 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 2**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+
+# Create doc
+App.newDocument("Kettle")
+App.setActiveDocument("Kettle")
+App.ActiveDocument = App.getDocument("Kettle")
+Gui.ActiveDocument = App.getDocument("Kettle")
+
+# 1. Body
+body = App.ActiveDocument.addObject("Part::Cylinder", "Body")
+body.Radius = 40
+body.Height = 100
+body.Placement = App.Placement(App.Vector(0, 0, -50), App.Rotation(0, 0, 0, 1)) # Shift so base is at 0? Or center at 0. 
+# Let's keep center at 0,0,0. Z ranges -50 to 50.
+
+# 2. Spout
+# A cylinder on the side.
+spout = App.ActiveDocument.addObject("Part::Cylinder", "Spout")
+spout.Radius = 8
+spout.Height = 40
+# Move to side
+# Base of spout should start around x=40, z=20.
+# Let's position the center of the cylinder.
+# x=40, y=0, z=30.
+# Rotation around X: -45 degrees (points up).
+spout.Placement = App.Placement(App.Vector(40, 0, 30), App.Rotation(App.Vector(1, 0, 0), -45))
+
+# 3. Handle
+# Let's use a Torus
+handle = App.ActiveDocument.addObject("Part::Torus", "Handle")
+handle.Radius1 = 30 # Major
+handle.Radius2 = 6  # Minor
+# Position on the left side: x = -40.
+# We need it to look like a handle.
+# Default Torus is in XY plane centered at 0.
+# Rotate 90 deg around Y to make it vertical in ZY plane.
+# Then rotate 90 deg around Z? 
+# Let's try placement: x=-40, y=0, z=30.
+# Rotation: Axis (0,1,0), Angle 90. Then Axis (1,0,0), Angle 90?
+# Let's keep it simple.
+handle.Placement = App.Placement(App.Vector(-40, 0, 30), App.Rotation(App.Vector(0, 1, 0), 90))
+
+# 4. Recompute
+App.ActiveDocument.recompute()
+
+# 5. View
+Gui.ActiveDocument.activeView().viewIsometric()
+Gui.ActiveDocument.activeView().fitAll()
+```
+
+**Error Message**:
+name 'App' is not defined
+
+**User's instruction was**:
+创建一个水壶
+
+**Selection Info**:
+No selection

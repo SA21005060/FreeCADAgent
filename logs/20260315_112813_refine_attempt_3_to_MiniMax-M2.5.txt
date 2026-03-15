@@ -1,0 +1,39 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 3**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import FreeCADGui
+
+# Fix: Check if there is an active document. If not, create a new one.
+if FreeCAD.ActiveDocument is None:
+    FreeCAD.newDocument()
+
+# 1. Create the Sphere
+# Define the radius (e.g., 10 mm)
+sphere = FreeCAD.ActiveDocument.addObject("Part::Sphere", "MySphere")
+sphere.Radius = 10
+
+# 2. Recompute to update the geometry
+FreeCAD.ActiveDocument.recompute()
+
+# 3. Fit the view to see the whole object
+FreeCADGui.SendMsgToActiveView("ViewFit")
+
+# 4. Set Isometric View
+FreeCADGui.ActiveDocument.activeView().viewIsometric()
+```
+
+**Error Message**:
+'CADAssistantPanel' object has no attribute 'confirm_button'
+
+**User's instruction was**:
+创建一个球
+
+**Selection Info**:
+No selection

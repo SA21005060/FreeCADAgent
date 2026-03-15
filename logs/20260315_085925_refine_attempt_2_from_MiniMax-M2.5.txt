@@ -1,0 +1,343 @@
+<think>
+The user wants a FreeCAD Python macro that creates a "Cartoon Robot".
+The user provided an "Attempt 2" which failed.
+The error message is `viewDefault`.
+The code snippet provided shows:
+`FreeCADGui.ActiveDocument.activeView().viewDefault() # Or .ActiveView`
+
+It seems the user is trying to call `viewDefault()` which doesn't exist in the FreeCAD API (or at least not in that context or spelling).
+The standard way to reset the camera in FreeCAD Python is `FreeCADGui.ActiveDocument.ActiveView.fitAll()` and `FreeCADGui.ActiveDocument.ActiveView.viewIsometric()`. The user already has these lines at the bottom, but maybe they are failing earlier or the code structure is wrong, or the specific command `viewDefault` is causing the script to stop before the rest runs (or maybe it's the only error visible).
+
+Let's analyze the goal: Create a "Cartoon Robot".
+The prompt asks to fix the macro.
+The error message points to `viewDefault`. This function doesn't exist.
+The user commented `# Or .ActiveView`.
+The correct API is usually:
+`FreeCADGui.ActiveDocument.ActiveView` is the view object.
+Methods: `fitAll()`, `viewIsometric()`, `viewAxonometric()`, `viewFront()`, etc.
+
+The previous attempt likely had `viewDefault` which failed. I should remove it or replace it with the working commands already present at the end of the snippet.
+
+Let's generate a complete, working macro for a "Cartoon Robot".
+I need to create a simple robot using basic shapes (Boxes, Cylinders) to resemble a cartoon robot.
+
+**Plan:**
+1.  Initialize document.
+2.  Create Body parts (Head, Body, Arms, Legs).
+    *   Head: Box + smaller boxes for eyes/antenna.
+    *   Body: Box/Cylinder.
+    *   Arms: Cylinders + spheres/boxes for hands.
+    *   Legs: Cylinders/Boxes + feet.
+3.  Position them relative to each other.
+4.  Apply colors to make it look "cartoonish" (bright colors).
+5.  Set the view (Fit All + Isometric).
+
+**Code Structure:**
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# 1. New Doc
+App = FreeCAD
+Gui = FreeCADGui
+App.newDocument("CartoonRobot")
+App.setActiveDocument("CartoonRobot")
+
+# Create parts
+# ... (Geometry creation code) ...
+
+# 2. View
+try:
+    Gui.ActiveDocument.ActiveView.fitAll()
+    Gui.ActiveDocument.ActiveView.viewIsometric()
+except Exception as e:
+    print("View error:", e)
+```
+
+**Geometry details:**
+*   **Head**: A cube. Position (0, 0, 70). Color: Light Grey/White.
+*   **Eyes**: Two small spheres or cubes. Yellow.
+*   **Body**: A larger cube or cylinder. Position (0, 0, 35). Color: Blue.
+*   **Arms**: Cylinders on sides. Color: Grey.
+*   **Legs**: Cylinders below. Color: Dark Grey.
+*   **Feet**: Boxes at bottom. Color: Black.
+
+Let's refine the code to ensure it runs without errors. The specific error in the prompt was `viewDefault`. I will ensure this is not called.
+
+**Refined Code Construction:**
+
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# Define colors (r, g, b)
+ColorBlue = (0.0, 0.0, 1.0)
+ColorGrey = (0.7, 0.7, 0.7)
+ColorYellow = (1.0, 1.0, 0.0)
+ColorBlack = (0.1, 0.1, 0.1)
+
+# 1. Create Document
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+
+# Helper function to create a box and place it
+def create_box(name, x, y, z, w, h, d, color):
+    box = FreeCAD.ActiveDocument.addObject("Part::Box", name)
+    box.Width = w
+    box.Height = h
+    box.Depth = d
+    box.Placement = FreeCAD.Placement(FreeCAD.Vector(x, y, z), FreeCAD.Rotation(0, 0, 0, 1))
+    
+    # Get the material/view provider to set color
+    # Note: Setting color on object directly requires accessing its ViewObject
+    box.ViewObject.ShapeColor = color 
+    return box
+
+# Helper for cylinder
+def create_cyl(name, x, y, z, radius, height, color, rotation_axis=(0,0,1), angle=0):
+    cyl = FreeCAD.ActiveDocument.addObject("Part::Cylinder", name)
+    cyl.Radius = radius
+    cyl.Height = height
+    # Default cylinder is along Z. If we need other orientation, we rotate.
+    # For simple robot, let's keep them vertical or horizontal.
+    # Let's assume vertical (Z) for legs/torso, Horizontal for arms.
+    
+    # Actually, let's just place them simply.
+    cyl.Placement = FreeCAD.Placement(FreeCAD.Vector(x, y, z), FreeCAD.Rotation(FreeCAD.Vector(rotation_axis), angle))
+    cyl.ViewObject.ShapeColor = color
+    return cyl
+
+# --- Build Robot ---
+
+# 1. Torso (Blue Box)
+torso = create_box("Torso", 0, -15, 0, 30, 20, 40, ColorBlue) # x, y, z, w, h, d
+
+# 2. Head (Grey Box on top of torso)
+# Torso is at z=0 to 40 roughly? No, let's define center based.
+# Let's use Center coordinates for placement.
+# Actually, FreeCAD creates boxes at (0,0,0) and we move them.
+# Let's just stack them relative to z.
+
+# Clear previous logic, let's do simple absolute stacking.
+# Torso: Center (0, 10, 20). Size 40x30x50.
+torso = create_box("Torso", -20, -15, 0, 40, 30, 50, ColorBlue)
+
+# Head: On top of Torso. Torso Top is z=50. Head Center should be z = 50 + head_height/2.
+# Head Size 50x40x40.
+head = create_box("Head", -25, -20, 50, 50, 40, 40, ColorGrey)
+
+# Eyes (Yellow)
+eye_l = create_box("EyeL", -15, -25, 60, 10, 5, 5, ColorYellow)
+eye_r = create_box("EyeR", 5, -25, 60, 10, 5, 5, ColorYellow)
+
+# Antenna
+antenna = create_cyl("Antenna", 0, -20, 90, 2, 20, ColorGrey)
+antenna_ball = create_box("AntennaBall", -5, -25, 110, 10, 10, 10, ColorYellow)
+
+# Arms (Cylinders)
+# Left Arm
+arm_l = create_cyl("ArmL", -35, -10, 20, 8, 40, ColorGrey, rotation_axis=(1,0,0), angle=0) 
+# Wait, default cylinder is vertical (Z). To make it horizontal, rotate 90 deg around Y.
+# Rotation(angle, x, y, z) -> FreeCAD.Rotation(axis, angle)
+# Let's place them simply.
+# Left Arm: x=-35, y=-10. Vertical? No, usually cartoon robots have arms sticking out.
+# Let's make arms horizontal cylinders.
+# Rotate 90 deg around Y axis.
+arm_l = create_cyl("ArmL", -40, -10, 25, 8, 40, ColorGrey, rotation_axis=(0,1,0), angle=90)
+
+arm_r = create_cyl("ArmR", 20, -10, 25, 8, 40, ColorGrey, rotation_axis=(0,1,0), angle=90)
+
+# Legs
+leg_l = create_cyl("LegL", -15, -10, -25, 10, 50, ColorGrey)
+leg_r = create_cyl("LegR", 15, -10, -25, 10, 50, ColorGrey)
+
+# Feet
+foot_l = create_box("FootL", -25, -25, -50, 20, 30, 10, ColorBlack)
+foot_r = create_box("FootR", 5, -25, -50, 20, 30, 10, ColorBlack)
+
+
+# --- View ---
+# The user failed at viewDefault.
+# I will ensure this part is correct.
+FreeCADGui.ActiveDocument.ActiveView.fitAll()
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+Wait, checking `FreeCAD.Rotation` syntax.
+`FreeCAD.Rotation(FreeCAD.Vector(x,y,z), angle)` is the standard way.
+Also `FreeCAD.Rotation(angle, x, y, z)` (scalar rotation) is valid.
+In the snippet: `FreeCAD.Rotation(0, 0, 0, 1)` (Quaternion components w, x, y, z).
+`FreeCAD.Placement(Vector, Rotation)`.
+Rotation axis-angle: `FreeCAD.Rotation(FreeCAD.Vector(0,1,0), 90)`. This returns a rotation.
+
+Let's stick to standard commands.
+
+**Addressing the failure:**
+The user explicitly mentioned the error `viewDefault`. This function does not exist. I must replace it with valid API calls. The user's snippet *had* `viewDefault` but also had `fitAll` and `viewIsometric` at the end. It's possible the error stopped execution before those ran, or the user is just highlighting that specific line as the culprit. I will provide a clean script without `viewDefault`.
+
+**Final Polish of the script:**
+1.  Create doc.
+2.  Create Body, Head, Arms, Legs, Eyes.
+    *   Use simple boxes/cylinders.
+    *   Apply random or specific cartoon colors.
+3.  Camera setup.
+
+Let's write the final code.
+
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# Create new document
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+
+# Define Colors (R, G, B)
+col_body = (0.2, 0.5, 0.8)   # Blue
+col_head = (0.9, 0.9, 0.9)   # White/Grey
+col_joint = (0.8, 0.8, 0.8)  # Grey
+col_eye = (1.0, 0.8, 0.0)    # Yellow
+col_foot = (0.1, 0.1, 0.1)   # Black
+
+# Helper to set color
+def set_color(obj, color):
+    obj.ViewObject.ShapeColor = color
+
+# --- Geometry ---
+
+# 1. Torso (Box)
+torso = FreeCAD.ActiveDocument.addObject("Part::Box", "Torso")
+torso.Width = 40
+torso.Height = 30
+torso.Depth = 50
+torso.Placement = FreeCAD.Placement(FreeCAD.Vector(-20, -15, 0), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(torso, col_body)
+
+# 2. Head (Box)
+head = FreeCAD.ActiveDocument.addObject("Part::Box", "Head")
+head.Width = 50
+head.Height = 40
+head.Depth = 40
+head.Placement = FreeCAD.Placement(FreeCAD.Vector(-25, -20, 50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(head, col_head)
+
+# 3. Eyes (Cylinders)
+eye1 = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Eye1")
+eye1.Radius = 5
+eye1.Height = 2
+eye1.Placement = FreeCAD.Placement(FreeCAD.Vector(-15, -24, 60), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(eye1, col_eye)
+
+eye2 = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Eye2")
+eye2.Radius = 5
+eye2.Height = 2
+eye2.Placement = FreeCAD.Placement(FreeCAD.Vector(15, -24, 60), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(eye2, col_eye)
+
+# 4. Antenna (Cylinder + Sphere)
+ant_stick = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "AntennaStick")
+ant_stick.Radius = 2
+ant_stick.Height = 20
+ant_stick.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -20, 90), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(ant_stick, col_joint)
+
+ant_ball = FreeCAD.ActiveDocument.addObject("Part::Sphere", "AntennaBall")
+ant_ball.Radius = 6
+ant_ball.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -20, 100), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(ant_ball, col_eye)
+
+# 5. Arms (Cylinders)
+arm_l = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "ArmL")
+arm_l.Radius = 8
+arm_l.Height = 40
+# Rotate 90 deg around Y to make horizontal
+arm_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-50, -10, 20), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(arm_l, col_joint)
+
+arm_r = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "ArmR")
+arm_r.Radius = 8
+arm_r.Height = 40
+arm_r.Placement = FreeCAD.Placement(FreeCAD.Vector(50, -10, 20), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(arm_r, col_joint)
+
+# 6. Legs (Cylinders)
+leg_l = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "LegL")
+leg_l.Radius = 10
+leg_l.Height = 50
+leg_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-15, -10, -25), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(leg_l, col_joint)
+
+leg_r = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "LegR")
+leg_r.Radius = 10
+leg_r.Height = 50
+leg_r.Placement = FreeCAD.Placement(FreeCAD.Vector(15, -10, -25), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(leg_r, col_joint)
+
+# 7. Feet (Boxes)
+foot_l = FreeCAD.ActiveDocument.addObject("Part::Box", "FootL")
+foot_l.Width = 20
+foot_l.Height = 30
+foot_l.Depth = 10
+foot_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-25, -25, -50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(foot_l, col_foot)
+
+foot_r = FreeCAD.ActiveDocument.addObject("Part::Box", "FootR")
+foot_r.Width = 20
+foot_r.Height = 30
+foot_r.Depth = 10
+foot_r.Placement = FreeCAD.Placement(FreeCAD.Vector(5, -25, -50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(foot_r, col_foot)
+
+# --- View Setup ---
+# Fix the error: viewDefault is not a valid function.
+# Use fitAll() and viewIsometric()
+FreeCADGui.ActiveDocument.ActiveView.fitAll()
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+This looks complete and correct. I will present this code. I will remove comments about the error to keep the code clean but mention the fix in the description. The prompt specifically asks to fix the code where `viewDefault` failed.
+
+The user's prompt: "Attempt 2... Error Message: viewDefault".
+The instruction: "Generate a complete FreeCAD Python macro...".
+
+I will output the corrected code.
+
+One detail: `FreeCAD.newDocument` creates a new doc, `FreeCAD.setActiveDocument` sets it active. Then `FreeCADGui.ActiveDocument` should work.
+Sometimes `FreeCAD.ActiveDocument` is needed for object creation, `FreeCADGui.ActiveDocument` for view. The code uses both correctly.
+
+I'll make sure the imports are clean.
+I will assume standard FreeCAD installation paths (built-in modules).
+
+Final check on syntax:
+`FreeCAD.Placement(Vector, Rotation)`
+`FreeCAD.Rotation(axis, angle)` -> Correct.
+`obj.ViewObject.ShapeColor` -> Correct.
+
+The result should be a cute robot.
+
+One small thing: `FreeCAD.newDocument` usually returns the document object, but calling it by name `FreeCAD.setActiveDocument("CartoonRobot")` is fine.
+The code is ready.
+
+Double check rotation syntax for cylinders.
+`FreeCAD.Rotation(FreeCAD.Vector(0,1,0), 90)` creates a rotation of 90 degrees around Y axis.
+This turns a Z-aligned cylinder into a Y-aligned one? No, default cylinder is Z aligned.
+Rotate 90 deg around Y (0,1,0). Z becomes X. So it aligns with X axis.
+If we want it sticking out left/right (X axis), yes, that's correct.
+If we want it vertical, no rotation needed.
+My code: `ArmL` x = -50. Rotation 90 around Y. Cylinder axis becomes X. It points left/right. Correct.
+
+The code is solid.
+
+One minor fix: `FreeCAD.Rotation` takes degrees in some contexts and radians in others? No, `FreeCAD.Rotation(axis, angle)` takes angle in degrees. `FreeCAD.Rotation(x, y, z, w)` takes quaternion.
+Wait, `FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)` is degrees. Yes.
+
+Okay, generating response.
+</think>
+
+Here is the corrected FreeCAD Python macro. The main issue in your previous attempt was using `viewDefault()`, which is not a valid FreeCAD function. The code below creates a colorful cartoon robot using basic shapes (Boxes and Cylinders) and uses the correct `fitAll()`

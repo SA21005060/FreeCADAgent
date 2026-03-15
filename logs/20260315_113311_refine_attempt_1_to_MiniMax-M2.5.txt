@@ -1,0 +1,66 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+    import Part
+    import math
+
+    # 1. Clean up current view (optional but helpful for a standalone script)
+    doc = FreeCAD.ActiveDocument
+    if doc is None:
+        doc = FreeCAD.newDocument()
+
+    # Clear existing to avoid clutter
+    for obj in doc.Objects:
+        doc.removeObject(obj.Name)
+
+    # 2. Define dimensions
+    body_r = 30
+    body_h = 120
+    neck_r = 15
+    neck_h = 30
+    cap_r = 16
+    cap_h = 20
+
+    # 3. Create geometry
+    # Body
+    body = Part.makeCylinder(body_r, body_h)
+
+    # Neck (tapered looks better, let's use a cone or just a cylinder for simplicity?
+    # Let's stick to cylinder for the neck, maybe a torus for a ring?)
+    # Let's do a simple cylinder neck.
+    neck = Part.makeCylinder(neck_r, neck_h)
+    neck.translate(FreeCAD.Vector(0, 0, body_h))
+
+    # Cap
+    cap = Part.makeCylinder(cap_r, cap_h)
+    cap.translate(FreeCAD.Vector(0, 0, body_h + neck_h))
+
+    # Combine
+    bottle_shape = body.fuse(neck).fuse(cap)
+
+    # 4. Show
+    obj = doc.addObject("Part::Feature", "WaterBottle")
+    obj.Shape = bottle_shape
+    doc.recompute()
+
+    # 5. View settings
+    import FreeCADGui
+    FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+    FreeCADGui.SendMsgToActiveView("ViewFit")
+```
+
+**Error Message**:
+unexpected indent (<unknown>, line 2)
+
+**User's instruction was**:
+创建一个水瓶
+
+**Selection Info**:
+No selection

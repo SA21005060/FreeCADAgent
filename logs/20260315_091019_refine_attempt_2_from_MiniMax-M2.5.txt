@@ -1,0 +1,300 @@
+<think>
+The user wants a FreeCAD Python macro to create a vase.
+The user provided a failed attempt and the error message: "unexpected indent (<unknown>, line 2)".
+
+Let's look at the failed code:
+```python
+import FreeCAD
+    import Part
+    import math
+    ...
+```
+The error "unexpected indent" at line 2 suggests there are leading spaces before `import Part`. Looking at the provided snippet, the lines after `import FreeCAD` are indented. This is invalid Python syntax for a top-level script.
+
+I need to generate the corrected code. The logic of the previous attempt seems mostly sound for a simple lathe operation, although I should review the geometry points to ensure a nice vase shape.
+
+Let's analyze the geometry in the failed code:
+- p1 = (0,0,0) - Center bottom
+- p2 = (2,0,0) - Base radius
+- p3 = (7,10,0) - Widest part
+- p4 = (3,20,0) - Neck
+- p5 = (4.5,28,0) - Rim
+- p6 = (0,28,0) - Center top
+
+This looks like a standard profile for a lathe.
+
+Issues in the failed code:
+1. Indentation errors (lines 2 and 3 are indented).
+2. In the interpolate method, usually, you need more control points or use a different constructor. `Part.BSplineCurve.interpolate` takes points and optionally flags. However, a simpler approach often works better for basic shapes: `Part.BSplineCurve` can be constructed from a list of points using `approximate` or just creating a curve from a list of vertices. The `interpolate` method requires the `points` parameter.
+3. `profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])`: A wire must be a closed loop of edges. The order matters, and they must connect.
+    - Edge 1: curve (p1 -> p2 -> p3 -> p4 -> p5)
+    - Edge 2: line_top (p5 -> p6)
+    - Edge 3: line_axis (p6 -> p1)
+    This seems correct topologically.
+4. `profile_face = Part.Face(profile_wire)`: This creates a planar face. Since the profile is in the XY plane (Z=0), this is a valid base face.
+5. `vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)`: Revolve around Y axis.
+    Wait, if the profile is in XY plane (Z=0), and we revolve around Y axis (0,1,0), the axis goes through (0,0,0) and (0,1,0). The points must lie on one side of the axis. Here p1 is (0,0,0). This is the origin.
+    The points are (radius, height, 0). So X is radius, Y is height.
+    The axis is the Y-axis.
+    This should work.
+
+Let's fix the indentation and verify the API calls.
+
+Refined Plan:
+1. Fix indentation (make it a standard script).
+2. Use `FreeCAD` and `Part` modules.
+3. Define points.
+4. Create the Spline. `Part.BSplineCurve` API:
+   - `Part.BSplineCurve()` -> create curve.
+   - `.interpolate(points)` -> passes through points.
+   - Or just use `Part.BSplineCurve(p1, p2, ...)`? No, that takes poles.
+   - Let's use `interpolate`.
+5. Create lines.
+6. Create Wire. Note: Order matters. The edges must connect.
+   - Curve: p1 to p5.
+   - Line: p5 to p6.
+   - Line: p6 to p1.
+   Wait, if p1 is (0,0,0) and p6 is (0,28,0), the line is along the axis.
+   However, creating a Face from a wire that lies exactly on the axis of revolution can sometimes be tricky (zero width). But since the profile is "thick" (has a base radius 2), it should be fine.
+   Actually, if we revolve a line on the axis, it creates a surface, not a solid volume unless capped.
+   The profile defines the *surface*.
+   If we make a face from the closed loop (Base -> Curve -> Top -> Axis -> Base), we get a "fan" shape. Revolving this creates a solid vase.
+   
+   Let's check connectivity:
+   - Curve ends at p5 (4.5, 28, 0).
+   - Line Top: p5 -> p6 (0, 28, 0).
+   - Line Axis: p6 -> p1 (0, 0, 0).
+   - Curve starts at p1.
+   So it is a closed loop.
+   
+   One detail: `curve.interpolate([p1, p2, p3, p4, p5])` might fail if the points are coplanar? No, they are in XY plane. It should work.
+   However, sometimes `interpolate` needs explicit handling.
+   Safer approach: `curve = Part.BSplineCurve()`
+   `curve.interpolate(FreeCAD.Vector list)` is correct.
+
+6. Revolve:
+   `profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)`
+   Note: The first argument is the center (or start point of axis). The second is the direction. The third is the angle.
+   `revolve(Base::Vector3, Base::Vector3, double)` -> Axis defined by point and direction.
+   The code uses `p1` (0,0,0) and direction (0,1,0). This is correct.
+
+7. View:
+   Set isometric view.
+
+One correction on the previous code's logic:
+The user provided code had indentation errors. I will remove them.
+Also, `p1` is (0,0,0). The axis passes through p1.
+The code seems mostly correct, just syntax errors in the provided snippet.
+
+Let's double check the `interpolate` method usage.
+In FreeCAD Python:
+`curve = Part.BSplineCurve()`
+`curve.interpolate(list_of_vectors)`
+This works.
+
+Code structure:
+```python
+import FreeCAD
+import Part
+import math
+
+# 1. Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+
+# 2. Define Profile Points (Radius, Height)
+# X is radius, Y is height, Z is 0
+p1 = FreeCAD.Vector(0, 0, 0)
+p2 = FreeCAD.Vector(2, 0, 0)
+p3 = FreeCAD.Vector(7, 10, 0) # Widest point
+p4 = FreeCAD.Vector(3, 20, 0) # Neck
+p5 = FreeCAD.Vector(4.5, 28, 0) # Rim flare
+p6 = FreeCAD.Vector(0, 28, 0) # Close shape at top (Center axis)
+
+# 3. Create the profile curve (Spline)
+curve = Part.BSplineCurve()
+curve.interpolate([p1, p2, p3, p4, p5])
+
+# 4. Create closing lines
+line_top = Part.makeLine(p5, p6)
+line_axis = Part.makeLine(p6, p1)
+
+# 5. Create a Wire (Profile)
+# Ensure order is continuous: Curve (p1->p5), Top (p5->p6), Axis (p6->p1)
+profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+# 6. Create a Face (needed for revolution)
+profile_face = Part.Face(profile_wire)
+
+# 7. Revolve (Lathe)
+# Axis: Y-axis (passing through p1)
+vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+# 8. Create Object
+obj = doc.addObject("Part::Feature", "Vase")
+obj.Shape = vase_shape
+
+# 9. Recompute
+doc.recompute()
+
+# 10. Set View
+App.ActiveDocument = App.getDocument("Vase")
+Gui.ActiveDocument = Gui.getDocument("Vase")
+Gui.SendMsgToActiveView("ViewFit")
+
+# Set isometric view
+view = Gui.ActiveDocument.ActiveView
+view.viewIsometric()
+```
+
+One minor thing: `App.setActiveDocument` vs `App.ActiveDocument = ...`. Usually, in macros, `App.ActiveDocument = doc` is fine.
+The error was definitely the indentation in the provided snippet. I will output the clean code.
+
+Wait, `Part.BSplineCurve().interpolate()` creates a periodic curve by default if not specified? No, by default it's not periodic. It passes through points.
+However, if the first and last point match, it might try to close it smoothly.
+Here p1 is (0,0,0) and p5 is (4.5, 28, 0). They are different.
+The wire closes them with lines. This is correct.
+
+One final check: `Part.makeLine(p6, p1)` goes from top axis to bottom axis. `Part.Wire` needs connected edges.
+Start of curve: p1.
+End of curve: p5.
+Start of line_top: p5. (Connected to curve)
+End of line_top: p6.
+Start of line_axis: p6. (Connected to line_top)
+End of line_axis: p1. (Connected to curve start)
+This forms a closed loop. Perfect.
+
+The error was "unexpected indent". This happens if lines start with spaces.
+I will provide the code without leading spaces.
+
+```python
+import FreeCAD
+import Part
+import math
+
+# 1. Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+
+# 2. Define Profile Points (Radius, Height)
+# X is radius, Y is height, Z is 0
+p1 = FreeCAD.Vector(0, 0, 0)
+p2 = FreeCAD.Vector(2, 0, 0)
+p3 = FreeCAD.Vector(7, 10, 0) # Widest point
+p4 = FreeCAD.Vector(3, 20, 0) # Neck
+p5 = FreeCAD.Vector(4.5, 28, 0) # Rim flare
+p6 = FreeCAD.Vector(0, 28, 0) # Close shape at top (Center axis)
+
+# 3. Create the profile curve (Spline)
+curve = Part.BSplineCurve()
+curve.interpolate([p1, p2, p3, p4, p5])
+
+# 4. Create closing lines
+line_top = Part.makeLine(p5, p6)
+line_axis = Part.makeLine(p6, p1)
+
+# 5. Create a Wire (Profile)
+# The curve is an edge, lines are edges.
+profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+# 6. Create a Face (needed for revolution)
+profile_face = Part.Face(profile_wire)
+
+# 7. Revolve (Lathe)
+# Axis: Y-axis (passing through p1)
+vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+# 8. Create Object
+obj = doc.addObject("Part::Feature", "Vase")
+obj.Shape = vase_shape
+
+# 9. Recompute
+doc.recompute()
+
+# 10. Set View
+App.ActiveDocument = App.getDocument("Vase")
+Gui.ActiveDocument = Gui.getDocument("Vase")
+Gui.SendMsgToActiveView("ViewFit")
+
+# Set isometric view
+view = Gui.ActiveDocument.ActiveView
+view.viewIsometric()
+```
+This looks exactly like the input code but with indentation fixed. The input code had:
+```python
+import FreeCAD
+    import Part
+    import math
+```
+Line 2 was indented.
+Also check `App.setActiveDocument("Vase")` might not be strictly necessary if we just set `App.ActiveDocument`, but it's fine.
+
+I will output the corrected code block.
+
+One slight improvement: `view.viewIsometric()` might not exist on all view objects in all versions, but in the standard GUI it does. `Gui.ActiveDocument.ActiveView` is a `View3DView`. `viewIsometric()` is the method.
+
+Final verification of the logic:
+- Profile in XY plane.
+- Revolve around Y axis.
+- Result is a solid of revolution.
+- Looks like a vase.
+- The code executes without indentation errors.
+
+Ready.
+</think>
+
+Here is the corrected FreeCAD Python macro. The main issue in the previous code was incorrect indentation (lines were indented with spaces, making Python think they were part of a block). This version is syntactically correct.
+
+```python
+import FreeCAD
+import Part
+import math
+
+# 1. Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+
+# 2. Define Profile Points (Radius, Height)
+# X is radius, Y is height, Z is 0
+p1 = FreeCAD.Vector(0, 0, 0)
+p2 = FreeCAD.Vector(2, 0, 0)
+p3 = FreeCAD.Vector(7, 10, 0) # Widest point
+p4 = FreeCAD.Vector(3, 20, 0) # Neck
+p5 = FreeCAD.Vector(4.5, 28, 0) # Rim flare
+p6 = FreeCAD.Vector(0, 28, 0) # Close shape at top (Center axis)
+
+# 3. Create the profile curve (Spline)
+curve = Part.BSplineCurve()
+curve.interpolate([p1, p2, p3, p4, p5])
+
+# 4. Create closing lines
+line_top = Part.makeLine(p5, p6)
+line_axis = Part.makeLine(p6, p1)
+
+# 5. Create a Wire (Profile)
+# Ensure edges are connected: Curve -> Top Line -> Axis Line
+profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+# 6. Create a Face (needed for revolution)
+profile_face = Part.Face(profile_wire)
+
+# 7. Revolve (Lathe)
+# Axis: Y-axis (passing through p1)
+vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+# 8. Create Object
+obj = doc.addObject("Part::Feature", "Vase")
+obj.Shape = vase_shape
+
+# 9. Recompute
+doc.recompute()
+
+# 10. Set View
+App.ActiveDocument = App.getDocument("Vase")
+Gui.ActiveDocument = Gui.getDocument("Vase")
+Gui.SendMsgToActiveView("ViewFit")
+
+# Set isometric view
+view = Gui.ActiveDocument.ActiveView
+view.viewIsometric()
+```

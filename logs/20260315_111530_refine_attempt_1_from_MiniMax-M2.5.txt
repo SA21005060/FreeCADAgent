@@ -1,0 +1,102 @@
+<think>
+The user wants me to fix a FreeCAD Python macro that failed due to an indentation error.
+
+**Analysis of the Failed Macro:**
+1.  **Language:** Python.
+2.  **Goal:** Create a sphere in FreeCAD.
+3.  **Error:** `unexpected indent (<unknown>, line 2)`.
+4.  **Code causing error:**
+    ```python
+    import FreeCAD
+        import Part
+        import FreeCADGui
+    ```
+    Line 2 is indented incorrectly. In Python, top-level imports cannot have leading whitespace.
+
+**Plan:**
+1.  Correct the indentation of the imports.
+2.  Ensure the code follows standard FreeCAD scripting practices (Create Document -> Create Shape -> Add Object -> Recompute -> View).
+3.  Add comments explaining the steps in Chinese (since the prompt is in Chinese: "创建一个球" = "Create a sphere").
+4.  Include the view setting commands (`fitAll`, `viewIsometric`) as requested.
+
+**Drafting the Code:**
+```python
+import FreeCAD
+import Part
+import FreeCADGui
+
+# 1. Define Sphere Parameters
+radius = 5.0
+
+# 2. Create the Sphere Shape
+sphere_shape = Part.makeSphere(radius)
+
+# 3. Get or Create Document
+doc = FreeCAD.ActiveDocument
+if not doc:
+    doc = FreeCAD.newDocument()
+
+# 4. Add object to document
+obj = doc.addObject("Part::Feature", "MySphere")
+obj.Shape = sphere_shape
+doc.recompute()
+
+# 5. View Settings (Isometric and Fit)
+if FreeCAD.GuiUp:
+    gui_view = FreeCADGui.ActiveDocument.ActiveView
+    gui_view.fitAll()
+    gui_view.viewIsometric()
+```
+
+**Verification:**
+- Imports are at column 0.
+- Logic is sound.
+- View settings are wrapped in `if FreeCAD.GuiUp:` to prevent errors if run in console mode (though usually macros are run in GUI).
+
+**Refinement:**
+The user prompt "创建一个球" is very short. I will provide the corrected code and a brief explanation.
+
+The error was specifically:
+`import Part` was indented under `import FreeCAD`.
+Also `import FreeCADGui` was indented.
+
+I will provide the cleaned-up version.
+
+One minor check: Does `Part.makeSphere` exist? Yes, it's the standard way. `Part.Shape` assignment is the standard way.
+
+Let's construct the final response.
+</think>
+
+Here is the corrected macro code.
+
+The main issue in the previous code was **incorrect indentation** on the import lines. In Python, `import` statements must always start at the beginning of the line (no leading spaces).
+
+Here is the fixed code:
+
+```python
+import FreeCAD
+import Part
+import FreeCADGui
+
+# 1. 定义球体参数 (Define Sphere Parameters)
+radius = 5.0
+
+# 2. 创建球体形状 (Create the Sphere Shape)
+sphere_shape = Part.makeSphere(radius)
+
+# 3. 获取或创建文档 (Get or Create Document)
+doc = FreeCAD.ActiveDocument
+if not doc:
+    doc = FreeCAD.newDocument()
+
+# 4. 将对象添加到文档 (Add object to document)
+obj = doc.addObject("Part::Feature", "MySphere")
+obj.Shape = sphere_shape
+doc.recompute()
+
+# 5. 视图设置：等轴测视图并适应模型 (View Settings: Isometric and Fit)
+if FreeCAD.GuiUp:
+    gui_view = FreeCADGui.ActiveDocument.ActiveView
+    gui_view.fitAll()
+    gui_view.viewIsometric()
+```

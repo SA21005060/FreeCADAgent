@@ -1,0 +1,328 @@
+<think>
+Here's a thinking process that leads to the suggested FreeCAD Python macro for creating a vase:
+
+1.  **Understand the Goal:** The user wants to create a "vase" (花瓶) using a FreeCAD Python macro.
+
+2.  **Determine the Approach:**
+    *   *How do you make a vase in CAD?* The most common and flexible way is using a **Lathe** (revolve) operation or a **Sweep** (extrusion along a path).
+    *   *Lathe (Revolution):* Draw a 2D profile (half cross-section) of the vase and spin it around an axis. This is the easiest and most robust method for a classic vase shape.
+    *   *Sweep:* Requires a spine (path) and a profile. Good for curved vases, but Lathe is usually better for symmetrical ones.
+    *   * loft:* Requires multiple profiles at different heights. Good for complex shapes, but requires more data points.
+
+    *Decision:* I will use the **Lathe** method because it produces smooth, rotational symmetry which is characteristic of most vases. I will define a set of X,Y coordinates that represent the profile (radius vs. height) and use the `Part.Revolve` function.
+
+3.  **Designing the Profile (The "Shape"):**
+    *   I need a set of points that look like a vase.
+    *   *Base:* Small radius, flat.
+    *   *Body:* Widens out (bulges).
+    *   *Neck:* Tapers back in.
+    *   *Rim:* Flares out slightly at the top.
+    *   *Draft Coordinates (Radius, Height):*
+        *   (1, 0)    - Bottom center
+        *   (3, 0)    - Bottom edge
+        *   (6, 10)   - Widest part (belly)
+        *   (4, 25)   - Neck narrows
+        *   (5, 30)   - Rim flares
+        *   (5, 30)   - Close the shape (needs to be a closed wire)
+
+4.  **Writing the FreeCAD Python Code:**
+
+    *   **Imports:** Need `FreeCAD`, `Part`, `Draft`, `math`.
+    *   **Document Creation:** `FreeCAD.newDocument()`, `FreeCAD.setActiveDocument()`.
+    *   **Creating the Sketch (Profile):**
+        *   Instead of creating a Sketch object directly (which can be complex in scripting), it's often easier to create a `Part.Wire` from points and then revolve it. However, using `Draft.makeWire` or `Part.makePolygon` is cleaner for macros. Let's stick to `Part.Wire` or just simple geometry.
+        *   *Better approach:* Use `FreeCAD.ActiveDocument.addObject("Sketcher::SketchObject", "Profile")`. This allows for a parametric approach.
+        *   *Simpler approach for a script:* Create a list of `Vector` points, make a `Wire`, then revolve. But `Part.Revolve` needs a face or a closed wire.
+        *   *Let's use the Sketch approach:* It's more standard for users to edit later.
+
+    *   **Drafting the Sketch Geometry (in code):**
+        *   Map the points defined in step 3 to the XY plane (Sketch plane).
+        *   Since it's a lathe, the axis is usually Y or Z. Let's use the Z-axis (vertical) for the height, and use the X-axis for the radius. Wait, FreeCAD Sketches are on XY. So Height = Y, Radius = X.
+        *   Points: `(x, y)`
+            *   (1, 0) -> No, let's start at axis? No, let's make the profile curve.
+            *   (0, 0) -> Start at center axis? No, standard lathes revolve around axis.
+            *   Let's define the curve starting from X=0 (axis).
+            *   (0, 0)
+            *   (3, 0)  -> Base
+            *   (8, 15) -> Belly
+            *   (4, 28) -> Neck
+            *   (6, 32) -> Rim
+        *   Actually, creating a sketch via script involves setting constraints. This is tedious and error-prone in raw python without a library.
+        *   *Alternative:* Create the points, make a line, revolve.
+        *   *Best Simple Script:* Use `Part` workbench basic commands via Python.
+            1. Define points.
+            2. Create a Polygon or Wire.
+            3. Create a Face (since revolve needs a shape with area).
+            4. Revolve around Y-axis (or Z-axis).
+
+5.  **Refining the Code Structure:**
+
+    *   **Step 1: Setup.** Clear/Create Doc.
+    *   **Step 2: Geometry.** Create points. Create a Spline (Bezier) is best for organic shapes, but a Polygon (Line segments) is easier to code. Let's try a Spline for smoothness.
+    *   **Step 3: The Shape.**
+        *   Points: `Vector(0, 0, 0), Vector(3, 0, 0), Vector(8, 12, 0), Vector(4, 25, 0), Vector(5, 30, 0)` (using X as Radius, Y as Height).
+        *   Create `Part.BSplineCurve` from these points.
+        *   Create a filled surface or a solid? Usually, a vase is hollow, but a solid is fine for a basic start. To make it hollow, we usually use a thickness or a separate inner profile. Let's stick to a solid first for simplicity, maybe add a `Thickness` command later if needed. Let's stick to a simple solid revolve.
+    *   **Step 4: Revolve.** `shape.revolve(Vector(0,0,0), Vector(0,0,1), 360)`? No, revolve around an axis. Usually Y axis in the sketch. Let's try revolving the profile around the Y-axis (0,0,0), (0,1,0).
+
+6.  **Drafting the specific Python commands:**
+
+    ```python
+    import FreeCAD
+    import Part
+    import Draft
+
+    # Create new doc
+    doc = FreeCAD.newDocument("Vase")
+
+    # Define profile points (Radius, Height) -> We will draw on XY plane
+    # Axis of revolution is Y axis.
+    # Points: (x, y, z) -> x is radius, y is height.
+    p1 = FreeCAD.Vector(0, 0, 0)
+    p2 = FreeCAD.Vector(3, 0, 0)
+    p3 = FreeCAD.Vector(8, 10, 0) # Bulge
+    p4 = FreeCAD.Vector(4, 25, 0) # Neck
+    p5 = FreeCAD.Vector(5.5, 30, 0) # Rim
+    p6 = FreeCAD.Vector(0, 30, 0) # Close back to axis at top
+
+    # Create a Spline
+    curve = Part.BSplineCurve()
+    curve.interpolate([p1, p2, p3, p4, p5, p6])
+    
+    # Create a wire
+    wire = Part.Wire(curve.toShape())
+    
+    # To make a solid via revolve, we need a Face.
+    # We need a closed profile. The curve is open (it goes out and back).
+    # Let's make a simple Polygon first to ensure it works, then upgrade to Spline.
+    # Actually, to close it for revolve:
+    # We have points. The line from p5 to p6 and p6 to p1 closes the loop.
+    
+    # Let's try the BSpline approach properly:
+    # Add the closing lines.
+    line1 = Part.makeLine(p5, p6)
+    line2 = Part.makeLine(p6, p1)
+    
+    # Combine curve + lines into a single wire
+    # Note: BSplineCurve.toShape() returns an edge. We need to connect them.
+    # This gets complicated.
+    
+    # Simplest Robust Way:
+    # Use Draft and its built-in tools? No, we are in Python.
+    # Let's use the Profile Sketch method, it's the most "FreeCAD" way.
+    ```
+
+    *Revised Plan (The "Sketch" Method):*
+    1. Create a Sketch.
+    2. Add Lines/Polylines (Geoelements).
+    3. Add Coincidence constraints (to make them connected).
+    4. Add horizontal/vertical constraints if desired.
+    5. Revolve the Sketch.
+
+    *Wait, the "Sketch" method via script is very verbose (adding constraints).*
+
+    *Revised Plan (The "Part" Method - Geometric Construction):*
+    1. Define points.
+    2. Create a Spline `Part.BSplineCurve`.
+    3. Create a Line from end to start to close it.
+    4. Create a Face from the Wire.
+    5. Revolve the Face around the Y-axis.
+    6. Add a hollow interior (using `shell` or `thickness`) to make it a real vase.
+
+    Let's refine the "Hollow" part.
+    1. Revolve the Outer Profile.
+    2. Scale the profile down slightly (or create a second inner profile).
+    3. Make a Boolean Cut (Outer minus Inner).
+
+    *Let's keep it simple first: Solid Vase. Then offer the code to make it hollow.*
+
+    *Let's write the code for the Solid Vase using a Sketch, it's cleaner for the user.*
+
+    **Code Logic:**
+    1. `doc = FreeCAD.newDocument("Vase")`
+    2. `sketch = doc.addObject('Sketcher::SketchObject', 'Profile')`
+    3. `sketch.addGeometry(Part.LineSegment(...))` -> This is hard to position perfectly without constraints.
+    
+    *Let's go back to the BSpline + Revolve approach. It's the most direct geometric way in Python scripting.*
+
+    **Coordinates:**
+    Let's define the profile on the X-Y plane.
+    Axis of revolution: Y-axis.
+    Points:
+    1. (0,0,0) - Origin
+    2. (2,0,0) - Base Radius
+    3. (7,12,0) - Belly
+    4. (3,25,0) - Neck
+    5. (4,30,0) - Rim Top
+    6. (0,30,0) - Back to Axis
+
+    **Python Implementation Steps:**
+    1. Import FreeCAD, Part.
+    2. Create vectors.
+    3. Create BSpline.
+    4. Create closing lines.
+    5. Create Wire.
+    6. Create Face.
+    7. Revolve (Axis: (0,0,0) to (0,1,0)).
+    8. Add to doc.
+    9. View Fit.
+
+    *Self-Correction:* BSplines in FreeCAD sometimes fail to make a face if they aren't perfectly aligned or simple. A `makeLoft` is good, but `revolve` is best. Let's stick to `Part.Wire` constructed from Line segments for guaranteed success, or a very simple Arc/Line combo. Let's use a Spline, it usually works fine if closed properly.
+
+    *Refining the code for the final output:*
+    I will provide a script that:
+    1. Creates the 3D view.
+    2. Generates the profile using a BSpline (for a nice curve).
+    3. Revolves it to make a solid.
+    4. (Optional but nice) Creates a "shell" or simple thickness to make it hollow. *Actually, let's stick to a solid first to ensure it runs without errors for the user, as boolean operations can be finicky in scripts.*
+
+    Let's add the code to set the view to Isometric.
+
+    **Final Code Structure:**
+    ```python
+    import FreeCAD
+    import Part
+    import math
+
+    # 1. Create Document
+    doc = FreeCAD.newDocument("Vase")
+    App.setActiveDocument("Vase")
+
+    # 2. Define Profile Points (Radius, Height)
+    # Using X for radius, Y for height, Z=0
+    p1 = FreeCAD.Vector(0, 0, 0)
+    p2 = FreeCAD.Vector(2, 0, 0)
+    p3 = FreeCAD.Vector(7, 10, 0) # Widest point
+    p4 = FreeCAD.Vector(3, 20, 0) # Neck
+    p5 = FreeCAD.Vector(4.5, 28, 0) # Rim flare
+    p6 = FreeCAD.Vector(0, 28, 0) # Close shape at top
+
+    # 3. Create the profile curve (Spline)
+    curve = Part.BSplineCurve()
+    curve.interpolate([p1, p2, p3, p4, p5])
+
+    # 4. Create closing lines
+    line_top = Part.makeLine(p5, p6)
+    line_axis = Part.makeLine(p6, p1)
+
+    # 5. Create a Wire (Profile)
+    # The curve is an edge, lines are edges.
+    profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+    # 6. Create a Face (needed for revolution)
+    profile_face = Part.Face(profile_wire)
+
+    # 7. Revolve (Lathe)
+    # Axis: Y-axis
+    vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+    # 8. Create Object
+    obj = doc.addObject("Part::Feature", "Vase")
+    obj.Shape = vase_shape
+
+    # 9. Recompute
+    doc.recompute()
+
+    # 10. Set View
+    App.ActiveDocument = App.getDocument("Vase")
+    Gui.ActiveDocument = Gui.getDocument("Vase")
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.ActiveDocument.ActiveView.setCameraType("Orthographic") # Optional
+    # Set isometric view manually
+    view = Gui.ActiveDocument.ActiveView
+    view.viewIsometric()
+    ```
+
+    *Double Check:* `curve.toShape()` is an Edge. `Part.Wire` takes a list of edges.
+    Order of edges matters for a Wire to be continuous.
+    1. Curve (p1->p5)
+    2. Line (p5->p6)
+    3. Line (p6->p1)
+    This should form a closed loop.
+
+    Let's refine the aesthetic.
+    Base: Flat.
+    Profile:
+    - Start at (0,0)
+    - (2,0) -> Cylinder base
+    - Bezier to (7, 10) -> Round body
+    - Bezier to (3, 25) -> Narrow neck
+    - Bezier to (5, 30) -> Flared top
+    - (0, 30) -> Close to axis.
+
+    This looks like a good plan. I will include comments in Chinese as requested.
+
+7.  **Adding the Hollow Logic (Bonus):**
+    A vase is rarely a solid block of plastic. It needs a hole.
+    How to do this in script simply?
+    Option A: Boolean Cut.
+    1. Create inner profile (similar to outer but scaled).
+    2. Revolve inner profile.
+    3. Cut Outer - Inner.
+    This is safer than `Thickness` (Shell) which often fails on complex topology.
+    *Decision:* I will stick to the Solid Vase first to keep the code clean and guaranteed to run, but I will mention in the explanation how to make it hollow, or add a simple thickness parameter if it's easy.
+    Actually, FreeCAD's `makeThickness` (or `Thickness` in Part workbench) is easy.
+    `vase_shape = vase_shape.makeThickness(-1, 0.5)` -> thickness of 1mm.
+    Let's add this at the end. It makes the result much more impressive.
+
+8.  **Final Polish:**
+    - Add `App.recompute()` at the end.
+    - Ensure imports are correct.
+    - Ensure view setting is at the end.
+
+9.  **Output Generation:** Produce the Python code block.
+
+    *Self-Correction during code writing:*
+    The `revolve` method signature is `shape.revolve(axisStart, axisEnd, angle)`.
+    Axis: `FreeCAD.Vector(0, 0, 0)` to `FreeCAD.Vector(0, 1, 0)`.
+    
+    Let's ensure the code handles the "Closed Wire" correctly.
+    Using `Part.BSplineCurve` gives an Edge.
+    Using `Part.Wire([edge1, edge2, edge3])` creates the wire.
+    Then `Part.Face(wire)` makes the surface.
+    Then `face.revolve(...)`.
+
+    Let's write the code.
+
+**(Self-Correction on Isometric View):**
+The command `viewIsometric()` is a method of the view object.
+`Gui.ActiveDocument.ActiveView.viewIsometric()` is correct.
+
+**(Self-Correction on Thickness):**
+`makeThickness` takes (inner_offset, tolerance).
+It works best if the shape is a solid.
+So: Revolve -> `Part.Solid` -> `makeThickness`.
+Wait, a revolved Face is a shell (hollow) by default if not filled? No, `revolve` on a Face makes a Solid. `revolve` on a Wire makes a Surface (Shell).
+So:
+1. Wire (Closed) -> Face -> Revolve -> Solid.
+2. Solid.makeThickness -> Hollow Solid.
+This is the best approach.
+
+Let's finalize the code.
+</think>
+
+这是一个完整的 FreeCAD Python 宏脚本，用于创建一个优雅的花瓶。
+
+这个脚本做了以下几件事：
+1.  **创建轮廓**：使用贝塞尔曲线（B-Spline）来定义花瓶的平滑曲线（底部宽 -> 中部圆胖 -> 颈部收缩 -> 顶部外翻）。
+2.  **旋转成型 (Lathe)**：将 2D 轮廓围绕 Y 轴旋转 360 度生成实体。
+3.  **抽壳 (Hollow)**：自动将实体挖空，使其成为一个有壁厚的容器（这才是真正的花瓶）。
+4.  **视图设置**：自动调整视图为等轴测（Isometric）视图。
+
+### FreeCAD Python 宏代码
+
+您可以将以下代码直接复制到 FreeCAD 的 Python 控制台中运行，或者保存为 `.py` 文件并在 FreeCAD 中运行。
+
+```python
+import FreeCAD
+import Part
+import math
+import Draft
+
+def create_vase():
+    # 1. 创建新文档
+    doc_name = "Vase"
+    doc = FreeCAD.newDocument(doc_name)
+    FreeCAD.setActiveDocument(doc_name)
+    
+    # 2. 定义花瓶的剖面轮廓点 (X = 半径, Y = 高度

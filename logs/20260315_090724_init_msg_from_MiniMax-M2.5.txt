@@ -1,0 +1,87 @@
+import FreeCAD
+import FreeCADGui
+import math
+
+def create_airplane():
+    # 获取当前活动文档
+    doc = FreeCAD.ActiveDocument
+    if not doc:
+        doc = FreeCAD.newDocument()
+
+    # --- 1. 创建机身 (Fuselage) ---
+    # 使用圆柱体作为机身主体
+    fuselage = doc.addObject("Part::Cylinder", "Fuselage")
+    fuselage.Radius = 0.5
+    fuselage.Height = 10
+    # 旋转机身使其沿Y轴方向 (默认是Z轴)
+    fuselage.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 0), 
+        FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 90)
+    )
+    # 设置颜色 (白色)
+    fuselage.ViewObject.DiffuseColor = (0.9, 0.9, 0.9)
+
+    # --- 2. 创建主翼 (Main Wings) ---
+    # 使用长方体作为机翼
+    wing = doc.addObject("Part::Box", "MainWing")
+    wing.Length = 8.0   # 翼展
+    wing.Width = 1.5    # 翼弦
+    wing.Height = 0.2   # 翼厚
+    # 位置：居中，稍微偏后一点点
+    wing.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0.5, 0), 
+        FreeCAD.Rotation(0, 0, 0)
+    )
+    # 设置颜色 (蓝色)
+    wing.ViewObject.DiffuseColor = (0.2, 0.4, 0.8)
+
+    # --- 3. 创建尾翼 (Tail) ---
+    # 3.1 垂直尾翼 (Vertical Stabilizer)
+    v_tail = doc.addObject("Part::Box", "VerticalTail")
+    v_tail.Length = 0.2
+    v_tail.Width = 1.5
+    v_tail.Height = 1.5
+    # 位置：机身尾部 (-Y方向)
+    v_tail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, -4.5, 0.5), 
+        FreeCAD.Rotation(0, 0, 0)
+    )
+    # 颜色 (灰色)
+    v_tail.ViewObject.DiffuseColor = (0.7, 0.7, 0.7)
+
+    # 3.2 水平尾翼 (Horizontal Stabilizer)
+    h_tail = doc.addObject("Part::Box", "HorizontalTail")
+    h_tail.Length = 3.0
+    h_tail.Width = 0.8
+    h_tail.Height = 0.15
+    # 位置：机身尾部下方
+    h_tail.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, -4.5, 0), 
+        FreeCAD.Rotation(0, 0, 0)
+    )
+    h_tail.ViewObject.DiffuseColor = (0.7, 0.7, 0.7)
+
+    # --- 4. 刷新模型 ---
+    doc.recompute()
+
+    # --- 5. 视图设置 (View Settings) ---
+    gui = FreeCADGui
+    view = gui.ActiveDocument.ActiveView
+
+    # 开启轴显示
+    view.setAxisCross(True)
+
+    # 设置为正交投影 (Orthographic) 看起来更像技术图纸
+    view.setCameraType('Orthographic')
+
+    # 设置视图方向为等轴测 (Isometric)
+    # 这是一个常用的等轴测角度组合
+    view.viewIsometric()
+
+    # 自动缩放以适应模型 (Fit View)
+    view.fitAll()
+
+    print("飞机模型创建完成！")
+
+# 运行函数
+create_airplane()

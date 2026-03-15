@@ -1,0 +1,44 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+    import Part
+    import FreeCADGui
+
+    # 1. Define Sphere Parameters
+    radius = 5.0
+
+    # 2. Create the Sphere Shape
+    sphere_shape = Part.makeSphere(radius)
+
+    # 3. Get or Create Document
+    doc = FreeCAD.ActiveDocument
+    if not doc:
+        doc = FreeCAD.newDocument()
+
+    # 4. Add object to document
+    obj = doc.addObject("Part::Feature", "MySphere")
+    obj.Shape = sphere_shape
+    doc.recompute()
+
+    # 5. View Settings (Isometric and Fit)
+    if FreeCAD.GuiUp:
+        gui_view = FreeCADGui.ActiveDocument.ActiveView
+        gui_view.fitAll()
+        gui_view.viewIsometric()
+```
+
+**Error Message**:
+unexpected indent (<unknown>, line 2)
+
+**User's instruction was**:
+创建一个球
+
+**Selection Info**:
+No selection

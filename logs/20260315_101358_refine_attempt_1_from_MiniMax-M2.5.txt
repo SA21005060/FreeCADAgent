@@ -1,0 +1,306 @@
+<think>
+The user wants a FreeCAD Python macro to create a vase.
+The previous attempt failed with an error: "unexpected indent (<unknown>, line 2)".
+Looking at the provided code, the issue is clear: the code block starts with indentation inside the triple backticks in the prompt, which would be interpreted as part of the Python code when pasted. Specifically, the first line `import FreeCAD` is indented in the provided snippet (due to the formatting of the prompt), or there's just weird indentation at the start.
+
+Let's look at the code provided:
+```python
+import FreeCAD
+    import Part
+    import Sketcher
+    import PartDesign
+```
+Line 2 has 4 spaces of indentation. This is invalid Python. The error message confirms this.
+
+**Plan:**
+1.  Fix the indentation errors in the provided code.
+2.  Review the logic:
+    *   **Document Creation**: Standard.
+    *   **Body**: Standard.
+    *   **Sketch**: Defined on XY plane.
+    *   **Profile**: Defined using points. The points look like a profile for a revolution.
+        *   (0, 0, 0) -> (20, 0, 0) -> (45, 25, 0) -> (15, 60, 0) -> (22, 75, 0) -> (0, 75, 0).
+        *   This draws the right half of the profile (since X=0 is the center axis).
+        *   It creates line segments.
+    *   **Revolution**:
+        *   Object type: 'PartDesign::Revolution'.
+        *   Profile: The sketch.
+        *   Axis: The code uses `(sketch, 'N_Axis')` for `ReferenceAxis`. Usually, for a sketch on the XY plane, the "Vertical Axis" (N_Axis) is Y, but revolution happens around the vertical axis of the sketch. Wait, if the sketch is on the XY plane, the vertical axis of the sketch is Y. But usually, we revolve around the X-axis in 2D profile terms if the profile lies on X-Y?
+        *   Let's clarify coordinate systems.
+        *   Sketch is on XY plane.
+        *   Profile points: x=radius, y=height.
+        *   We want to revolve around the Y-axis (which corresponds to height).
+        *   The code sets `revolution.Axis = (0, 1, 0)`. This is the vector (X=0, Y=1, Z=0).
+        *   It also sets `revolution.ReferenceAxis = (sketch, 'N_Axis')`. 'N_Axis' usually refers to the Y-axis in the sketch coordinate system (Vertical).
+        *   However, `revolution.Axis` property in FreeCAD takes a tuple `(x, y, z)` *if* using the base object property, but for `PartDesign::Revolution`, it's usually set via `ReferenceAxis` or `Axis` property.
+        *   The provided code attempts to set `revolution.Axis` and `revolution.ReferenceAxis`.
+        *   Actually, for `PartDesign::Revolution`, `ReferenceAxis` is the correct way to specify the axis. The value `(sketch, 'N_Axis')` is correct for using the vertical axis of the sketch (Y-axis).
+        *   Wait, if the profile is on the XY plane, the "vertical" axis in the sketch (Y) corresponds to the Z axis in world space? No, XY plane means Z is normal. So Y is Y.
+        *   We want to revolve around the vertical axis (Y in the sketch, or the world Y if the sketch is not rotated).
+        *   Let's double check: Sketch on XY_Plane. Y is up. We want to spin around Y. Yes.
+    *   **Color**: Terracotta. Looks good.
+
+**Issues to fix specifically related to logic or potential runtime errors:**
+1.  **Indentation**: Remove leading spaces from lines 2-4.
+2.  **Sketch Geometry**: Adding lines individually (`Part.LineSegment`) doesn't automatically close the shape or constrain it to the axis. However, `PartDesign::Revolution` can handle open profiles if the axis is defined, but usually, it's safer to have a closed profile or at least anchored to the axis.
+    *   Points: (0,0) is center. (20,0) is radius. (0,75) is top center.
+    *   If we draw lines (0,0)->(20,0), (20,0)->(45,25)...
+    *   At (0,0), the line starts at X=0. At (0,75), it ends at X=0.
+    *   To ensure the revolution works cleanly (creating a solid), it's often better to use a `PartDesign::Pad` or similar if it's a closed shape, but Revolution is specifically asked for.
+    *   Revolution usually requires the profile to be "attached" to the axis or explicitly defined.
+    *   If I just add lines, the sketch has disconnected lines.
+    *   I should probably add a `Coincidence` constraint to lock the endpoints to the axis (X=0).
+    *   Specifically, the start point (0,0) and end point (0,75) should be constrained to the Vertical Axis (or just X=0).
+    *   Let's add a `Constraint('Coincident', ...)` or just `Constraint('Distance', ...)` to X=0 for those points to ensure they stay on the axis of revolution.
+
+3.  **Axis Definition**:
+    *   `revolution.Axis = (0, 1, 0)` sets a vector. But `PartDesign::Revolution` uses `ReferenceAxis`.
+    *   The code has both. Usually, it's one or the other.
+    *   Standard way: `revolution.ReferenceAxis = (sketch, 'N_Axis')`.
+    *   However, if the profile isn't closed or anchored to that axis, the revolution might fail or look weird (like a hollow shell or weird twist).
+    *   Let's constrain the points at X=0 to the sketch's vertical axis.
+
+**Refined Code Structure:**
+1.  Imports (fix indentation).
+2.  New Document.
+3.  Body.
+4.  Sketch on XY Plane.
+5.  Add Lines.
+6.  **Add Constraints**: Constrain the first and last points to the vertical axis (N_Axis) to ensure they lie on the revolution axis.
+7.  Revolution feature.
+    *   Use `ReferenceAxis = (sketch, 'N_Axis')`.
+    *   Or use `Axis = (0, 1, 0)` and `AxisOrigin = (0, 0, 0)`. Using the sketch axis is easier.
+8.  Color.
+9.  ViewFit.
+
+**Let's check the specific "unexpected indent" error again.**
+The user provided code:
+```python
+import FreeCAD
+    import Part
+    ...
+```
+The line `import Part` has leading spaces. I must remove them.
+
+**Additional improvements:**
+The profile points:
+(0,0) -> (20,0) -> (45,25) -> (15,60) -> (22,75) -> (0,75).
+This is a bit jagged. It works for a vase, but using B-Splines or arcs makes it smoother. However, the user provided lines, so I will stick to lines to minimize changes to the user's intended geometry, just fixing the code errors and constraints.
+
+**Constraint Details:**
+*   Sketch geometry indices:
+    *   Line 0: (0,0) to (20,0). Point 1 is (0,0).
+    *   Line 4: (22,75) to (0,75). Point 2 is (0,75).
+*   Constraint: Point 1 and Point 2 must lie on the Vertical Axis (N_Axis).
+*   In Sketcher, `Constraint('Coincident', edge_point_index, axis_index)`.
+*   Edge point index: 1 is usually the start point of Geo1, 2 is end? No, usually you get the point object or use indices.
+*   Actually, simpler: Add a horizontal constraint to the vertical axis? No.
+*   Constrain the points to be at X=0.
+*   `sketch.addConstraint(Sketcher.Constraint('DistanceX', 1, 0))` -> Distance of Point 1 (Geo1.StartPoint) from X-axis (which is horizontal) is 0? No, we want them on the Y-axis.
+*   The vertical axis in the sketch is 'N_Axis' (index -1 usually, or by name).
+*   `sketch.addConstraint(Sketcher.Constraint('Coincident', 1, -1))` -> Point 1 coincident with Y-axis.
+*   Wait, checking indices is tricky in generated code without knowing the exact order.
+*   Safer approach: Constrain the X-coordinate of the first point and last point to 0.
+*   First Point is usually Geo1.StartPoint (Index 1).
+*   Last Point is usually Geo5.EndPoint (Index ?).
+*   Let's use geometric elements.
+*   Geo1 (Line 1).StartPoint -> Constraint Coincident with N_Axis (Vertical Axis).
+*   Geo5 (Line 5).EndPoint -> Constraint Coincident with N_Axis (Vertical Axis).
+
+**Drafting the code:**
+
+```python
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+App.ActiveDocument = App.getDocument("Vase")
+Gui.ActiveDocument = Gui.getDocument("Vase")
+
+# Create Body
+body = App.ActiveDocument.addObject('PartDesign::Body', 'Body')
+
+# Create Sketch (Profile)
+sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'Sketch')
+sketch.Support = App.ActiveDocument.XY_Plane
+sketch.MapMode = 'FlatFace'
+
+# Define Vase Profile Points (x = radius, y = height)
+points = [
+    FreeCAD.Vector(0, 0, 0),       # Bottom center
+    FreeCAD.Vector(20, 0, 0),      # Bottom edge
+    FreeCAD.Vector(45, 25, 0),     # Belly
+    FreeCAD.Vector(15, 60, 0),     # Neck
+    FreeCAD.Vector(22, 75, 0),     # Rim flare
+    FreeCAD.Vector(0, 75, 0)       # Top center
+]
+
+# Add geometry to sketch (Lines)
+for i in range(len(points) - 1):
+    line = Part.LineSegment(points[i], points[i+1])
+    sketch.addGeometry(line)
+
+# Add Constraints to close the profile to the axis
+# The sketch lines are:
+# Geo1: (0,0) -> (20,0)
+# Geo2: (20,0) -> (45,25)
+# Geo3: (45,25) -> (15,60)
+# Geo4: (15,60) -> (22,75)
+# Geo5: (22,75) -> (0,75)
+
+# We need to constrain the start of Geo1 and end of Geo5 to the Vertical Axis (N_Axis)
+# Sketcher constraints:
+# (Geo1, 1) is start point. (Geo1, 2) is end point.
+# -1 is Vertical Axis.
+
+sketch.addConstraint(Sketcher.Constraint('Coincident', 1, -1)) # Geo1 start to N_Axis
+sketch.addConstraint(Sketcher.Constraint('Coincident', 5, 2)) # Geo5 end to N_Axis
+# Note: Indices might be 1-based or 0-based in Python API wrappers. 
+# Usually Geo1 is index 1. Start is 1, End is 2.
+# Let's try specific indices. 
+# If it fails, it's usually because indices are off, but this is standard.
+
+doc.recompute()
+
+# Create Revolution
+revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+revolution.Profile = sketch
+revolution.Angle = 360.0
+revolution.ReferenceAxis = (sketch, 'N_Axis')
+
+# Set Appearance (Color)
+revolution.ViewObject.ShapeColor = (0.8, 0.4, 0.3) # Terracotta color
+
+doc.recompute()
+
+# Fit View
+Gui.SendMsgToActiveView("ViewFit")
+Gui.activeDocument().activeView().viewIsometric()
+```
+
+Wait, checking the indices in `Part.LineSegment` added to `SketchObject`.
+When adding geometry, the first geometry added is usually index 1 (Geo1).
+If I add 5 lines:
+Line 1 -> Geo1
+Line 2 -> Geo2
+...
+Line 5 -> Geo5
+
+The points on these lines are accessed via constraints using pairs (GeoId, PointId).
+(1, 1) -> Geo1 Start
+(1, 2) -> Geo1 End
+(2, 1) -> Geo2 Start
+(2, 2) -> Geo2 End
+
+So:
+Geo1 Start (1,1) -> N_Axis (-1).
+Geo5 End (5,2) -> N_Axis (-1).
+
+Let's adjust the code:
+`sketch.addConstraint(Sketcher.Constraint('Coincident', 1, -1))` -> This assumes (Geo1, Start). In Python binding `Constraint('Coincident', int GeoId, int PointId)`, GeoId is 1-based. PointId is 1 for start, 2 for end.
+Wait, looking at documentation or previous macros: `Sketcher.Constraint('Coincident', 1, -1)` means Geo1 (entire line) coincident with axis -1? No.
+It usually takes vertex indices.
+The signature is `addConstraint(constraint)`.
+Arguments to constraint constructor: `Constraint(Type, GeoId1, GeoId2, [PosId1, PosId2])`.
+If GeoId is -1 (N_Axis), it refers to the axis.
+So `Sketcher.Constraint('Coincident', 1, -1)` means Geo1 coincident with N_Axis?
+This forces the *entire line* to be on the axis, which is wrong (it has a length).
+We want the *points* to be on the axis.
+So we need to specify the points.
+`Sketcher.Constraint('Coincident', 1, 2)` means Geo1 and Geo2 (vertex to vertex).
+For Vertex to Axis: `Sketcher.Constraint('Coincident', 1, -1, 1, 0)`?
+Actually, let's look at how `Coincident` works with an axis.
+Usually: `Constraint('Coincident', [GeoId, PointId], [GeoId, PointId])`.
+If second arg is axis (-1), it treats it as axis.
+So: `Constraint('Coincident', 1, 1, -1, 0)`. (Geo1, Point1, Axis_N, Point0?). This is getting complicated to guess.
+Simpler way: Force X coordinate to 0.
+Point 1 is Geo1 Start (Index 1, sub 1).
+Point 2 is Geo5 End (Index 5, sub 2).
+`sketch.addConstraint(Sketcher.Constraint('DistanceX', 1, 1, 0))` -> Distance of Point(1,1) from X-axis is 0? No, DistanceX is from Y-axis?
+Usually `DistanceX` is distance from Y-axis.
+`DistanceY` is distance from X-axis.
+So, `Constraint('DistanceX', 1, 1, 0)` -> Distance of point (Geo1, Start) from Y-axis is 0.
+And `Constraint('DistanceX', 5, 2, 0)` -> Distance of point (Geo5, End) from Y-axis is 0.
+This is robust and easy to understand.
+
+**Revisiting the previous error:**
+The error was indentation. I will just paste the corrected code.
+
+**Final Code Logic:**
+1. Imports.
+2. Setup Doc/Body/Sketch.
+3. Add Lines.
+4. Constrain points (0,0) and (0,75) to X=0 (DistanceX = 0).
+5. Revolution.
+6. View.
+
+One detail: `revolution.Axis = (0, 1, 0)` in the user code was likely wrong or ignored in favor of ReferenceAxis. I will remove the `revolution.Axis` line and rely on `revolution.ReferenceAxis`.
+
+Also, the user asked to "Generate a complete FreeCAD Python macro".
+
+```python
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+App = App.getDocument("Vase")
+Gui = App.Gui
+
+# Create Body
+body = App.addObject('PartDesign::Body', 'Body')
+
+# Create Sketch (Profile)
+sketch = App.addObject('Sketcher::SketchObject', 'Sketch')
+sketch.Support = App.XY_Plane
+sketch.MapMode = 'FlatFace'
+
+# Define Vase Profile Points (x = radius, y = height)
+points = [
+    FreeCAD.Vector(0, 0, 0),       # Bottom center
+    FreeCAD.Vector(20, 0, 0),      # Bottom edge
+    FreeCAD.Vector(45, 25, 0),     # Belly
+    FreeCAD.Vector(15, 60, 0),     # Neck
+    FreeCAD.Vector(22, 75, 0),     # Rim flare
+    FreeCAD.Vector(0, 75, 0)       # Top center
+]
+
+# Add geometry to sketch (Lines)
+for i in range(len(points) - 1):
+    line = Part.LineSegment(points[i], points[i+1])
+    sketch.addGeometry(line)
+
+# Add Constraints to lock the profile to the axis of revolution
+# We constrain the X coordinate of the start of the first line and end of the last line to 0
+# GeoID 1 is first line, SubID 1 is start point
+# GeoID 5 is last line, SubID 2 is end point
+sketch.addConstraint(Sketcher.Constraint('DistanceX', 1, 1, 0)) 
+sketch.addConstraint(Sketcher.Constraint('DistanceX', 5, 2, 0))
+
+doc.recompute()
+
+# Create Revolution
+revolution = App.addObject('PartDesign::Revolution', 'Revolution')
+revolution.Profile = sketch
+revolution.Angle = 360.0
+revolution.ReferenceAxis = (sketch, 'N_Axis')
+
+# Set Appearance (Color)
+revolution.ViewObject.ShapeColor = (0.8, 0.4, 0.3) # Terracotta color
+
+doc.recompute()
+
+# Fit View
+Gui.SendMsgToActiveView("ViewFit")
+Gui.activeDocument().activeView().viewIsometric()
+```
+
+One small thing: `App.ActiveDocument` vs `App.getDocument`. The user's code used `App.Active
+</think>

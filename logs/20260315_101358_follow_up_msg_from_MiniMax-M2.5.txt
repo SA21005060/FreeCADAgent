@@ -1,0 +1,336 @@
+<think>
+user wants a FreeCAD Python macro to create a vase.
+1.  **Analyze the Request**:
+    *   Target: Create a vase (花瓶).
+    *   Format: FreeCAD Python macro (.py file content).
+    *   Requirements: Must fit the view and set the isometric view.
+
+2.  **Determine the Approach**:
+    *   To create a complex shape like a vase, using a simple cylinder or box won't work well.
+    *   The best approach in FreeCAD for this is **Sketches + Pad/Pocket** or **Revolution (Lathe)**.
+    *   A **Revolution** (Lathe) is the most efficient way to make a symmetrical vase.
+        *   Draw half of the profile (the cross-section) in a Sketch.
+        *   Revolve it around an axis.
+    *   Alternative: **Sweep** (less suitable for a solid body without multiple profiles).
+    *   Let's stick to **Revolution** (PartDesign::Revolution).
+
+3.  **Drafting the Geometry (The Profile)**:
+    *   I need to define a series of points (X, Y) that form the silhouette of a vase.
+    *   Typical vase shape:
+        *   Base: narrow or flat.
+        *   Body: wide.
+        *   Neck: narrow.
+        *   Rim: flared or straight.
+    *   Let's define a set of coordinates for the Sketch (using a `Spline` or `Polyline`):
+        *   (0, 0) - Base center (axis of rotation).
+        *   (10, 0) - Base edge.
+        *   (30, 20) - Bulge.
+        *   (10, 50) - Neck.
+        *   (15, 60) - Rim flare.
+        *   (0, 60) - Top center.
+    *   Actually, for a revolution, the profile is 2D. I will draw a line on the Y-axis as the axis of revolution.
+    *   Coordinates (X, Y):
+        *   Point 0: (0, 0)
+        *   Point 1: (10, 0)  -> Base width
+        *   Point 2: (35, 20) -> Wide body
+        *   Point 3: (15, 50) -> Neck
+        *   Point 4: (20, 60) -> Rim flare out
+        *   Point 5: (0, 60)  -> Back to axis
+    *   Wait, the axis is usually the Y-axis in 2D sketches if looking from front.
+    *   Let's map X to Radius, Y to Height.
+    *   Sketch plane: XY (Front).
+    *   Axis of revolution: Y-axis (vertical).
+
+4.  **Writing the Code (Mental Draft)**:
+    *   Import `FreeCAD`, `PartDesign`.
+    *   Create a new document.
+    *   Create a Body.
+    *   Create a Sketch.
+        *   Set plane to XY.
+        *   Add geometry (BSpline or Polyline). Let's use a BSpline for a smooth curve, or just connected line segments for simplicity and robustness in a macro. Let's use a Polyline (SketchPolygon) for easier coordinate handling, or just a set of lines. A B-Spline is better for a "vase" look.
+        *   Let's construct a list of vectors and create a BSpline.
+    *   Create a Revolution feature.
+        *   Select the axis (Vertical sketch line or Y-axis).
+    *   Add some thickness? No, a solid revolution creates a solid.
+
+5.  **Refining the Code Structure**:
+    *   `doc = App.ActiveDocument`
+    *   `body = doc.addObject('PartDesign::Body', 'VaseBody')`
+    *   `sketch = doc.addObject('Sketcher::SketchObject', 'Profile')`
+    *   `sketch.Support = (doc.XY_Plane, [''])` (Need to verify plane syntax, usually (plane, offset)).
+    *   Coordinates: `geoList = []`
+        *   We need a closed loop.
+        *   Start at (0,0).
+        *   Line to (15, 0).
+        *   Line to (35, 20).
+        *   Line to (12, 60).
+        *   Line to (18, 70).
+        *   Line to (0, 70).
+        *   Close.
+    *   Let's try to make it smooth using `BSpline`. It looks much better for a vase.
+        *   Points: (0,0), (15,0), (35,20), (12,60), (18,70), (0,70).
+        *   Need to map these to `FreeCAD.Vector`.
+    *   Revolve: `revolution = doc.addObject('PartDesign::Revolution', 'Revolution')`
+    *   `revolution.Profile = sketch`
+    *   `revolution.Axis = (0, 1, 0)` (Y-axis)
+    *   `revolution.Angle = 360`
+
+6.  **Adding Color/Material**:
+    *   Let's add a simple color to make it look like a vase (maybe terracotta or white). `revolution.ViewObject.ShapeColor`.
+
+7.  **Camera/View**:
+    *   `Gui.SendMsgToActiveView("ViewFit")`
+    *   `Gui.activeDocument().activeView().viewIsometric()`
+
+8.  **Constructing the Python Script**:
+    *   *Imports*: `FreeCAD`, `FreeCADGui`, `Part`, `PartDesign`.
+    *   *Cleanup*: Check if object exists or clear selection.
+    *   *Geometry*: Define the points.
+    *   *Execution*:
+        1. Make Sketch.
+        2. Make Revolution.
+        3. Recompute.
+        4. View fit.
+
+9.  **Refining the Geometry for a Nice Vase**:
+    *   Base: Radius 10, Height 0.
+    *   Belly: Radius 40, Height 30.
+    *   Neck: Radius 15, Height 70.
+    *   Lip: Radius 20, Height 80.
+    *   Connect back to (0, 80).
+    *   Use a B-Spline for smoothness.
+    *   Code to create B-Spline: `App.Vector(x,y,0)` -> `sketch.addGeometry(Part.BSplineCurve(vectors))` is tricky in macro.
+    *   Easier way: Use `Sketcher::Constraint`? No, too verbose.
+    *   Standard way in macros for smooth curves: Create the geometry object manually.
+    *   `points = [FreeCAD.Vector(0,0,0), ...]`
+    *   `bspline = Part.BSplineCurve(points)`
+    *   `sketch.addGeometry(bspline, False)` (False means not linked? No, usually index).
+    *   Wait, for a closed revolution, I don't need to close the geometry at the axis manually if I use the "Axis" option in Revolution, but the profile usually must be on one side of the axis.
+    *   Let's just use a Polyline (lines) to ensure it works 100% without complex BSpline handling issues in a raw script, or try to implement the BSpline correctly.
+    *   BSpline is much better. Let's try:
+        `import Part`
+        `pts = [...]`
+        `bsp = Part.BSplineCurve(pts)`
+        `id = sketch.addGeometry(bsp, False)`
+        # Need to make sure the curve is constrained or just use the geometry.
+        # Since it's a macro, let's just define points and use lines for robustness, or simple cubic Bezier.
+        # Actually, a simple set of line segments is safest for a guaranteed run.
+        # Let's do a "Smooth" look by using enough points.
+
+    *   Let's stick to lines but curve the coordinates.
+    *   P1: (0,0)
+    *   P2: (15, 5)  (Base curve)
+    *   P3: (40, 30) (Body)
+    *   P4: (15, 60) (Neck)
+    *   P5: (20, 75) (Rim)
+    *   P6: (0, 75)  (Center top)
+    *   Close to P1.
+
+10. **Final Code Logic**:
+    *   `App.newDocument("Vase")`
+    *   `App.setActiveDocument("Vase")`
+    *   `App.ActiveDocument = App.getDocument("Vase")`
+    *   `Gui.ActiveDocument = Gui.getDocument("Vase")`
+    *   Create Body.
+    *   Create Sketch on XY.
+    *   Draw lines:
+        *   Line(0,0) -> (20,0)
+        *   Line(20,0) -> (45,25)
+        *   Line(45,25) -> (15,65)
+        *   Line(15,65) -> (22,80)
+        *   Line(22,80) -> (0,80)
+    *   (This creates a polygon).
+    *   Create Revolution.
+    *   Set Color.
+    *   Fit View.
+
+11. **Language**: The user asked in Chinese ("创建一个花瓶"). The response and comments should be Chinese or English? The prompt implies Chinese, so I will provide the explanation in Chinese and the code in Python.
+
+12. **Self-Correction during thought process**:
+    *   Make sure to handle the `recompute()` correctly so the feature updates before view change.
+    *   Ensure `viewIsometric` is called on the `activeView()`.
+
+13. **Drafting the Python Code**:
+    ```python
+    import FreeCAD
+    import Part
+    import Sketcher
+    import PartDesign
+
+    # Create Document
+    doc = FreeCAD.newDocument("Vase")
+    App.setActiveDocument("Vase")
+    App.ActiveDocument = App.getDocument("Vase")
+    Gui.ActiveDocument = Gui.getDocument("Vase")
+
+    # Create Body
+    body = App.ActiveDocument.addObject('PartDesign::Body', 'Body')
+
+    # Create Sketch (Profile)
+    sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'Sketch')
+    sketch.Support = App.ActiveDocument.XY_Plane
+    sketch.MapMode = 'FlatFace'
+
+    # Define Vase Profile Points (Radius, Height)
+    # We draw half of the vertical cross-section
+    # x = radius, y = height
+    # Using lines to form the silhouette
+    points = [
+        FreeCAD.Vector(0, 0, 0),       # Bottom center
+        FreeCAD.Vector(20, 0, 0),      # Bottom edge
+        FreeCAD.Vector(45, 25, 0),     # Belly
+        FreeCAD.Vector(15, 60, 0),     # Neck
+        FreeCAD.Vector(22, 75, 0),     # Rim flare
+        FreeCAD.Vector(0, 75, 0)       # Top center
+    ]
+
+    # Add geometry to sketch (Lines)
+    # We create line segments connecting these points
+    for i in range(len(points) - 1):
+        line = Part.LineSegment(points[i], points[i+1])
+        sketch.addGeometry(line)
+
+    # Add constraints to make it a closed loop?
+    # Actually, for a revolution, it doesn't strictly need to be a closed loop if we define the axis,
+    # but it's good practice. However, since we drew lines from center to edge, we are fine.
+    # Let's just add a Coincidence constraint to close the loop to the axis if needed,
+    # but points[0] and points[-1] are both on X=0.
+    # Actually, let's just use the Revolution feature which handles the axis.
+
+    doc.recompute()
+
+    # Create Revolution
+    revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+    revolution.Profile = sketch
+    revolution.Angle = 360.0
+    revolution.Axis = (0, 1, 0) # Z-axis in sketch is actually Y in 3D? No, Sketch is XY, so Z is normal.
+    # Wait, Sketch is on XY plane. Axis of revolution should be the vertical axis in the sketch (Y axis).
+    # (0, 1, 0) corresponds to the Y axis of the sketch.
+    revolution.ReferenceAxis = (sketch, 'N_Axis')
+
+    # Set Appearance (Color)
+    revolution.ViewObject.ShapeColor = (0.8, 0.4, 0.3) # Terracotta color
+
+    doc.recompute()
+
+    # Fit View
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.activeDocument().activeView().viewIsometric()
+    ```
+
+14. **Refining the code details**:
+    *   `revolution.ReferenceAxis` might be tricky. Sometimes it defaults to the vertical axis of the sketch. If not specified, I should probably define the axis in the sketch or use the default.
+    *   Actually, simpler approach: In Sketcher, constrain the first point to the X=0 axis (Y-axis). The Revolution feature usually defaults to the Vertical Axis (V_Axis) of the sketch if not specified.
+    *   To be safe, I will add a constraint: `sketch.addConstraint(Sketcher.Constraint('Coincident', 0, 2, -1, 1))` -> This is too complex to guess indices.
+    *   Easier: Just let it revolve around the Sketch's Y axis (Vertical). The property `Axis` in `PartDesign::Revolution` can be set to `(0, 1, 0)` which is the Y direction.
+
+    *   *Correction on Coordinate System*:
+        *   Sketch is on XY plane.
+        *   Y is up. X is horizontal.
+        *   Revolution axis `(0, 1, 0)` is the local Y axis of the sketch. This is correct.
+
+    *   *Color*: `(1.0, 0.5, 0.5)` is pink/red. Let's do a nice vase color.
+
+    *   *View*: `viewIsometric()` works well.
+
+15. **Final Polish**:
+    *   Ensure the macro starts cleanly.
+    *   Include comments explaining what it does.
+    *   Make sure to `recompute()` after adding geometry and features.
+
+    *Let's double check the point list.*
+    (0,0) -> (20,0) [Base]
+    (20,0) -> (45,25) [Bulge out]
+    (45,25) -> (15,60) [Curve in to neck]
+    (15,60) -> (22,75) [Flare out to rim]
+    (22,75) -> (0,75) [Back to center]
+    This looks like a solid vase profile.
+
+    Let's write the actual code block.
+
+    One detail: In FreeCAD Python API, `addGeometry` takes a geometry object. `Part.LineSegment` returns a curve, but `addGeometry` usually takes the specific geometry type (Line, Arc, BSpline).
+    So: `sketch.addGeometry(Part.LineSegment(p1, p2))` is the correct syntax.
+
+    Also, for the revolution to work perfectly as a solid, the profile should ideally be closed or attached to the axis. By having point (0,0) and (0,75), we are touching the axis.
+
+    Let's assemble.
+</think>
+
+这是一个使用 FreeCAD Python 编写的宏，用于创建一个漂亮的花瓶。
+
+这个脚本执行以下操作：
+1.  创建一个新的 FreeCAD 文档。
+2.  在 XY 平面上创建一个草图（Sketch），绘制花瓶的半边轮廓（包含底座、瓶身、瓶颈和瓶口）。
+3.  使用“旋转”（Revolution）功能将二维轮廓绕中心轴旋转 360 度，形成三维实体。
+4.  设置颜色为赤陶土色（Terracotta）。
+5.  自动调整视图为等轴测视图（Isometric View）并适应模型大小。
+
+### FreeCAD Python 宏代码
+
+你可以将以下代码复制到 FreeCAD 的 Python 编辑器中运行，或者保存为 `.py` 文件然后在 FreeCAD 中执行。
+
+```python
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# --- 1. 创建新文档 ---
+doc = FreeCAD.newDocument("Vase_FreeCAD")
+App.setActiveDocument("Vase_FreeCAD")
+App.ActiveDocument = App.getDocument("Vase_FreeCAD")
+Gui.ActiveDocument = Gui.getDocument("Vase_FreeCAD")
+
+# --- 2. 创建实体 Body ---
+body = App.ActiveDocument.addObject('PartDesign::Body', 'VaseBody')
+
+# --- 3. 创建草图 (绘制花瓶轮廓) ---
+# 在 XY 平面上创建草图
+sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'Profile')
+sketch.Support = App.ActiveDocument.XY_Plane
+sketch.MapMode = 'FlatFace'
+
+# 定义轮廓点 (X, Y) - X 为半径，Y 为高度
+# 这些点定义了花瓶的半边截面形状
+profile_points = [
+    FreeCAD.Vector(0, 0, 0),       # 底部中心
+    FreeCAD.Vector(20, 0, 0),     # 底部边缘
+    FreeCAD.Vector(50, 30, 0),    # 瓶身最宽处
+    FreeCAD.Vector(15, 65, 0),    # 瓶颈收缩处
+    FreeCAD.Vector(22, 80, 0),    # 瓶口外翻
+    FreeCAD.Vector(0, 80, 0)      # 顶部中心
+]
+
+# 将点连成线段添加到草图
+# 注意：必须确保轮廓是闭合的或连接到旋转轴上
+for i in range(len(profile_points) - 1):
+    line = Part.LineSegment(profile_points[i], profile_points[i+1])
+    sketch.addGeometry(line)
+
+# 隐藏草图以便于观察后续步骤（可选）
+# Gui.ActiveDocument.getObject('Profile').Visibility = False
+
+# --- 4. 旋转成型 (Revolution) ---
+# 使用 PartDesign 的旋转功能生成实体
+revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'VaseRevolution')
+revolution.Profile = sketch
+revolution.Angle = 360.0  # 旋转 360 度
+revolution.Axis = (0, 1, 0) # 绕草图的 Y 轴 (垂直轴) 旋转
+revolution.Refine = True # 自动优化边缘
+
+# --- 5. 设置颜色 (赤陶土色) ---
+revolution.ViewObject.ShapeColor = (0.85, 0.4, 0.2) 
+
+# --- 6. 更新文档并调整视图 ---
+doc.recompute()
+
+# 适应视图
+Gui.SendMsgToActiveView("ViewFit")
+
+# 设置为等轴测视图 (Isometric View)
+Gui.activeDocument().activeView().viewIsometric()
+
+print("花瓶已成功创建！")
+```
+
+### 如何

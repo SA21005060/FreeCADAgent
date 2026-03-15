@@ -1,0 +1,89 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 2**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+App.ActiveDocument = App.getDocument("Vase")
+Gui.ActiveDocument = Gui.getDocument("Vase")
+
+# Create Body
+body = App.ActiveDocument.addObject('PartDesign::Body', 'Body')
+
+# Create Sketch (Profile)
+sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'Sketch')
+sketch.Support = App.ActiveDocument.XY_Plane
+sketch.MapMode = 'FlatFace'
+
+# Define Vase Profile Points (x = radius, y = height)
+points = [
+    FreeCAD.Vector(0, 0, 0),       # Bottom center
+    FreeCAD.Vector(20, 0, 0),      # Bottom edge
+    FreeCAD.Vector(45, 25, 0),     # Belly
+    FreeCAD.Vector(15, 60, 0),     # Neck
+    FreeCAD.Vector(22, 75, 0),     # Rim flare
+    FreeCAD.Vector(0, 75, 0)       # Top center
+]
+
+# Add geometry to sketch (Lines)
+for i in range(len(points) - 1):
+    line = Part.LineSegment(points[i], points[i+1])
+    sketch.addGeometry(line)
+
+# Add Constraints to close the profile to the axis
+# The sketch lines are:
+# Geo1: (0,0) -> (20,0)
+# Geo2: (20,0) -> (45,25)
+# Geo3: (45,25) -> (15,60)
+# Geo4: (15,60) -> (22,75)
+# Geo5: (22,75) -> (0,75)
+
+# We need to constrain the start of Geo1 and end of Geo5 to the Vertical Axis (N_Axis)
+# Sketcher constraints:
+# (Geo1, 1) is start point. (Geo1, 2) is end point.
+# -1 is Vertical Axis.
+
+sketch.addConstraint(Sketcher.Constraint('Coincident', 1, -1)) # Geo1 start to N_Axis
+sketch.addConstraint(Sketcher.Constraint('Coincident', 5, 2)) # Geo5 end to N_Axis
+# Note: Indices might be 1-based or 0-based in Python API wrappers. 
+# Usually Geo1 is index 1. Start is 1, End is 2.
+# Let's try specific indices. 
+# If it fails, it's usually because indices are off, but this is standard.
+
+doc.recompute()
+
+# Create Revolution
+revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+revolution.Profile = sketch
+revolution.Angle = 360.0
+revolution.ReferenceAxis = (sketch, 'N_Axis')
+
+# Set Appearance (Color)
+revolution.ViewObject.ShapeColor = (0.8, 0.4, 0.3) # Terracotta color
+
+doc.recompute()
+
+# Fit View
+Gui.SendMsgToActiveView("ViewFit")
+Gui.activeDocument().activeView().viewIsometric()
+```
+
+**Error Message**:
+name 'App' is not defined
+
+**User's instruction was**:
+创建一个花瓶
+
+**Selection Info**:
+No selection

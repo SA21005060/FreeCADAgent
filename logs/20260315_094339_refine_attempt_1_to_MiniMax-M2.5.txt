@@ -1,0 +1,97 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+
+# ==========================================
+# 1. 设置文档
+# ==========================================
+# 如果没有打开文档，则创建一个新的
+if not FreeCAD.ActiveDocument:
+    FreeCAD.newDocument()
+
+doc = FreeCAD.ActiveDocument
+
+# ==========================================
+# 2. 定义花瓶的轮廓点 (高度, 半径)
+# ==========================================
+# 外轮廓点 (构成花瓶的外部形状)
+# 格式: FreeCAD.Vector(半径, 高度, 0)
+points_outer = [
+    FreeCAD.Vector(20, 0, 0),    # 底部中心
+    FreeCAD.Vector(30, 5, 0),    # 底部边缘
+    FreeCAD.Vector(60, 40, 0),   # 瓶身最宽处
+    FreeCAD.Vector(40, 80, 0),   # 瓶颈弯曲处
+    FreeCAD.Vector(25, 110, 0),  # 瓶颈
+    FreeCAD.Vector(30, 120, 0)   # 瓶口边缘
+]
+
+# 内轮廓点 (构成花瓶的内壁，用于挖空)
+# 这些点比外轮廓稍微小一点，形成厚度
+points_inner = [
+    FreeCAD.Vector(15, 5, 0),    # 底部内凹
+    FreeCAD.Vector(25, 10, 0),   # 内壁底部
+    FreeCAD.Vector(55, 40, 0),   # 瓶身内部
+    FreeCAD.Vector(35, 80, 0),   # 瓶颈内部
+    FreeCAD.Vector(20, 110, 0),  # 颈部内部
+    FreeCAD.Vector(25, 120, 0)   # 瓶口内部
+]
+
+# ==========================================
+# 3. 创建 B样条曲线 (平滑轮廓)
+# ==========================================
+# 创建外轮廓样条曲线
+spline_outer = Part.BsplineCurve()
+spline_outer.interpolate(points_outer)
+shape_outer = spline_outer.toShape()
+wire_outer = Part.Wire(shape_outer.Edges)
+
+# 创建内轮廓样条曲线
+spline_inner = Part.BsplineCurve()
+spline_inner.interpolate(points_inner)
+shape_inner = spline_inner.toShape()
+wire_inner = Part.Wire(shape_inner.Edges)
+
+# ==========================================
+# 4. 创建面并旋转
+# ==========================================
+# 创建一个带有“孔洞”的面 (第一个是外轮廓，第二个是内轮廓/孔)
+# 注意：这里不需要手动处理线的方向，FreeCAD会自动识别
+face = Part.Face([wire_outer, wire_inner])
+
+# 定义旋转轴 (Z轴)
+axis = FreeCAD.Vector(0, 0, 1)
+
+# 旋转 360 度生成实体
+vase = face.revolve(axis, 360)
+
+# ==========================================
+# 5. 显示结果
+# ==========================================
+Part.show(vase)
+doc.recompute()
+
+# ==========================================
+# 6. 视图设置 (等轴测视图并适应模型)
+# ==========================================
+Gui = FreeCADGui
+Gui.activeDocument().activeView().viewIsometric()
+Gui.activeDocument().activeView().fitAll()
+```
+
+**Error Message**:
+module 'Part' has no attribute 'BsplineCurve'
+
+**User's instruction was**:
+创建一个花瓶
+
+**Selection Info**:
+No selection

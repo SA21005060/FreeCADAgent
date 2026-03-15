@@ -1,0 +1,175 @@
+<think>
+The user wants to create a rectangular box (cuboid) using a FreeCAD Python macro.
+
+1.  **Understand the Goal:** The user asks to "创建一个长方体" (create a cuboid/rectangular box).
+
+2.  **Identify Key Parameters:** A standard cuboid in FreeCAD is usually created using `Part.Box` or `Part.Mesh.Box` (Mesh workbench) or `SolidBuilder` (PartDesign). The most common and straightforward way in a macro (usually scripting within the "Part" workbench context) is using `FreeCAD.ActiveDocument.addObject("Part::Box", "Name")`.
+    *   Length (Length)
+    *   Width (Width)
+    *   Height (Height)
+    *   Position (Placement)
+
+3.  **Determine the approach:**
+    *   Use the `Part` workbench functionality.
+    *   Set default dimensions (e.g., 10mm x 10mm x 10mm) or let the user know where to change them. Since the prompt is general ("create a box"), I will provide a standard size and explain how to change it.
+    *   The code needs to handle the creation of the document if it doesn't exist (though usually FreeCAD is open).
+    *   The code should set the View to Isometric and fit the scene.
+
+4.  **Drafting the Code:**
+
+    *   *Import FreeCAD:* `import FreeCAD`
+    *   *Create the Box:*
+        ```python
+        box = FreeCAD.ActiveDocument.addObject("Part::Box", "Box")
+        box.Length = 10
+        box.Width = 10
+        box.Height = 10
+        ```
+    *   *Recompute:* `FreeCAD.ActiveDocument.recompute()`
+    *   *View handling:*
+        *   Import `FreeCADGui`.
+        *   Get the active view: `FreeCADGui.ActiveDocument.ActiveView`.
+        *   Set view to Isometric: `view.setCameraType("Isometric")` or standard orientation logic.
+        *   Fit the view: `view.fitAll()`. Note: In newer FreeCAD versions (v0.21+), `fitAll()` might behave slightly differently or need `View.fitAll()` depending on context, but usually `ActiveView.fitAll()` works.
+
+5.  **Refining the Code:**
+    *   It's good practice to create the document if it doesn't exist, or assume the user has an open document. The standard script usually assumes `FreeCAD.ActiveDocument` is not None.
+    *   Let's add comments explaining the dimensions.
+    *   Let's make sure the view rotation is correct. The standard "Isometric" view usually requires setting the view direction. However, FreeCAD has a shortcut: `Gui.ActiveDocument.ActiveView.viewIsometric()`. Or setting the camera type. Let's use the standard method `viewIsometric()` if available, or manual rotation.
+    *   Actually, `FreeCADGui.ActiveDocument.ActiveView.viewIsometric()` is the easiest way to get an isometric view.
+
+6.  **Constructing the Final Python Script:**
+
+    ```python
+    import FreeCAD
+    import FreeCADGui
+
+    # Define dimensions
+    length = 10
+    width = 10
+    height = 10
+
+    # Create the Box object
+    # We add a Part::Box to the active document
+    box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyBox")
+    box.Length = length
+    box.Width = width
+    box.Height = height
+
+    # Update the document
+    FreeCAD.ActiveDocument.recompute()
+
+    # Set View to Isometric and Fit
+    view = FreeCADGui.ActiveDocument.ActiveView
+    view.viewIsometric()
+    view.fitAll()
+    ```
+
+7.  **Review against constraints:**
+    *   User wants a "长方体" (Cuboid).
+    *   Code includes view fitting and isometric setting. Yes.
+
+8.  **Final Output Generation:** Write the code block and a brief explanation in Chinese.
+
+    *   *Code Structure:*
+        1.  Set dimensions.
+        2.  Create object.
+        3.  Recompute.
+        4.  Set View.
+
+9.  **Self-Correction/Edge Cases:**
+    *   What if there is no document? `FreeCAD.newDocument()` is usually handled by the UI opening, but in a raw script, it might crash. I should probably add a check or just stick to the standard assumption that the user is running this inside FreeCAD. The prompt implies a macro for an existing FreeCAD session.
+    *   `Part::Box` creates a primitive. It appears at (0,0,0).
+    *   Is `viewIsometric()` available in all versions? Yes, it's quite standard.
+
+10. **Final Polish:** Present the code clearly.
+
+    *   Add Chinese comments to the code for better understanding.
+    *   Explain how to run it (Macro -> Execute).
+
+**(Self-Correction during drafting):** Wait, `viewIsometric()` sets the camera to isometric mode. `fitAll()` adjusts the zoom so the object fits the window. This satisfies the prompt's requirement to "fit the view" (适应视图) and "set isometric view" (设置等轴测视图).
+
+Let's write the response.
+
+Code:
+```python
+import FreeCAD
+import FreeCADGui
+
+# 1. 设置长方体的尺寸 (长, 宽, 高)
+length = 50
+width = 30
+height = 20
+
+# 2. 创建长方体
+# 在当前文档中添加一个 Part::Box 对象
+box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyCuboid")
+box.Length = length
+box.Width = width
+box.Height = height
+
+# 3. 重新计算文档以更新几何体
+FreeCAD.ActiveDocument.recompute()
+
+# 4. 设置视图为等轴测视图 (Isometric) 并适应视图
+view = FreeCADGui.ActiveDocument.ActiveView
+view.viewIsometric()  # 设置为等轴测视角
+view.fitAll()        # 自动缩放以适应整个物体
+```
+
+Looks good. I will output this.
+</think>
+
+这是一个在 FreeCAD 中创建长方体（立方体/盒子）的 Python 宏脚本。
+
+这段代码会创建一个指定尺寸的长方体，并将视图自动调整为等轴测（Isometric）视角且自动缩放以适应屏幕。
+
+```python
+import FreeCAD
+import FreeCADGui
+
+# ==========================================
+# 1. 定义长方体的尺寸 (单位：mm)
+# ==========================================
+length = 50  # 长度 (X轴方向)
+width = 30   # 宽度 (Y轴方向)
+height = 20  # 高度 (Z轴方向)
+
+# ==========================================
+# 2. 创建长方体对象
+# ==========================================
+# 使用 Part 工作台的几何体功能创建 Box
+box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyBox")
+box.Length = length
+box.Width = width
+box.Height = height
+
+# 确保属性设置后几何体正确生成
+FreeCAD.ActiveDocument.recompute()
+
+# ==========================================
+# 3. 设置视图并适应屏幕
+# ==========================================
+# 获取当前视图对象
+view = FreeCADGui.ActiveDocument.ActiveView
+
+# 设置为等轴测视图 (Isometric View)
+view.viewIsometric()
+
+# 自动缩放视图以完全显示创建的物体
+view.fitAll()
+
+print("长方体已创建，尺寸: {} x {} x {}".format(length, width, height))
+```
+
+### 如何使用：
+1. 打开 FreeCAD。
+2. 点击菜单栏的 **宏** (Macros) -> **执行宏** (Execute Macro)。
+3. 在弹出的对话框中，粘贴上面的代码并点击“执行”。
+4. 或者，您可以将代码保存为 `.py` 文件（例如 `make_box.py`），然后从宏管理器中运行它。
+
+### 代码说明：
+*   **`Part::Box`**：这是 FreeCAD 中用于创建长方体的核心对象类型。
+*   **`Length`, `Width`, `Height`**：定义长方体的三个维度。
+*   **`viewIsometric()`**：将相机视角切换为工程常用的等轴测视图。
+*   **`fitAll()`**：计算并调整缩放比例，确保创建的长方体完整地显示在当前视图窗口中。

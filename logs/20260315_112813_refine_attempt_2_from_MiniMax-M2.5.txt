@@ -1,0 +1,108 @@
+<think>
+1.  **Analyze the user's request**:
+    *   **Goal**: Create a sphere in FreeCAD using a Python macro.
+    *   **Context**: This is an attempt to fix a previous macro.
+    *   **Previous Code**:
+        ```python
+        import FreeCAD
+        import FreeCADGui
+
+        # 1. Create the Sphere
+        sphere = FreeCAD.ActiveDocument.addObject("Part::Sphere", "MySphere")
+        sphere.Radius = 10
+
+        # ... (rest of the code)
+        ```
+    *   **Error**: `'NoneType' object has no attribute 'addObject'`.
+    *   **Analysis of Error**: `FreeCAD.ActiveDocument` is returning `None`. This happens when there is no active document (i.e., no file is open or created).
+    *   **Instruction**: "创建一个球" (Create a sphere).
+
+2.  **Identify the root cause**:
+    *   The code tries to access `FreeCAD.ActiveDocument` immediately.
+    *   If the user runs this script in a fresh FreeCAD instance with no open document, `FreeCAD.ActiveDocument` is `None`.
+    *   Therefore, calling `.addObject()` on `None` raises the AttributeError.
+
+3.  **Formulate a solution**:
+    *   Check if a document exists. If not, create one.
+    *   Alternatively, simply creating a new document ensures `ActiveDocument` is not `None`.
+
+4.  **Draft the corrected code**:
+    *   Import modules.
+    *   Check if `FreeCAD.ActiveDocument` is None.
+    *   If None, create a new document: `FreeCAD.newDocument()`.
+    *   Now safely add the sphere object.
+    *   Recompute.
+    *   Fit view.
+    *   Set isometric view.
+
+5.  **Refining the Code**:
+    *   *Step 1*: Import modules.
+    *   *Step 2*: Handle the "No Document" error. The fix is `FreeCAD.newDocument()`. Sometimes just creating a new document is enough, but explicitly checking is safer.
+    *   *Step 3*: Create the Sphere.
+    *   *Step 4*: Recompute.
+    *   *Step 5*: ViewFit.
+    *   *Step 6*: Isometric view.
+
+6.  **Code Construction**:
+    ```python
+    import FreeCAD
+    import FreeCADGui
+
+    # Fix: Ensure a document exists
+    if FreeCAD.ActiveDocument is None:
+        FreeCAD.newDocument()
+
+    # 1. Create the Sphere
+    sphere = FreeCAD.ActiveDocument.addObject("Part::Sphere", "MySphere")
+    sphere.Radius = 10
+
+    # 2. Recompute
+    FreeCAD.ActiveDocument.recompute()
+
+    # 3. Fit the view
+    FreeCADGui.SendMsgToActiveView("ViewFit")
+
+    # 4. Set Isometric View
+    FreeCADGui.ActiveDocument.activeView().viewIsometric()
+    ```
+
+7.  **Final Review**:
+    *   Does this fix the error? Yes, because it guarantees `FreeCAD.ActiveDocument` is not `None`.
+    *   Does it meet the user's instruction (Create a sphere)? Yes.
+    *   Is it valid Python? Yes.
+
+8.  **Constructing the output**:
+    *   Provide the corrected code.
+    *   Explain *why* the error occurred (no active document) and how it was fixed (creating a new document if none exists).
+</think>
+
+The error `'NoneType' object has no attribute 'addObject'` occurs because there is no active document open in FreeCAD when the script runs. `FreeCAD.ActiveDocument` returns `None`, and you cannot add an object to `None`.
+
+Here is the corrected code. I added a check to create a new document if one doesn't exist.
+
+```python
+import FreeCAD
+import FreeCADGui
+
+# Fix: Check if there is an active document. If not, create a new one.
+if FreeCAD.ActiveDocument is None:
+    FreeCAD.newDocument()
+
+# 1. Create the Sphere
+# Define the radius (e.g., 10 mm)
+sphere = FreeCAD.ActiveDocument.addObject("Part::Sphere", "MySphere")
+sphere.Radius = 10
+
+# 2. Recompute to update the geometry
+FreeCAD.ActiveDocument.recompute()
+
+# 3. Fit the view to see the whole object
+FreeCADGui.SendMsgToActiveView("ViewFit")
+
+# 4. Set Isometric View
+FreeCADGui.ActiveDocument.activeView().viewIsometric()
+```
+
+### Explanation of the fix:
+*   **The Issue**: The original script assumed a document was already open. In FreeCAD, if you run a macro without an open file, `FreeCAD.ActiveDocument` is `None`.
+*   **The Solution**: The lines `if FreeCAD.ActiveDocument is None: FreeCAD.newDocument()` ensure that there is always a place (a document) to put the sphere before creating it.

@@ -1,0 +1,379 @@
+<think>
+The user wants a Python macro for FreeCAD to create a water bottle.
+The user provided a failed attempt and the error message: "unexpected indent (<unknown>, line 2)".
+
+Let's analyze the failed code:
+```python
+import FreeCAD
+    import Part
+    import math
+    ...
+```
+The error "unexpected indent" usually happens if there are leading spaces before the import statement or mismatched indentation inside the code.
+Looking at the snippet provided by the user:
+Line 1: `import FreeCAD`
+Line 2: `    import Part` -> This line has an indent. In Python, imports shouldn't be indented unless they are inside a function or class. Since line 1 is not indented, line 2 shouldn't be either.
+
+Wait, looking closely at the provided "Attempt 1":
+```python
+import FreeCAD
+    import Part
+    import math
+```
+This is clearly an indentation error in the provided snippet. However, the prompt says "The following macro failed" and shows that snippet. I should correct the indentation in the generated code.
+
+Now, let's look at the rest of the code to see if there are any other issues, but the error specifically points to line 2.
+
+Requirements:
+1. Create a water bottle.
+2. Fix the indentation error.
+3. Ensure the code fits the view and sets isometric view.
+
+The code logic seems mostly fine:
+- Creates a cylinder for the body.
+- Creates a cylinder for the neck.
+- Creates a cylinder for the cap.
+- Translates them.
+- Fuses them.
+- Adds to document.
+- Sets view.
+
+Let's refine the geometry to look a bit more like a water bottle (maybe a slight taper or just simpler shapes as requested). The user just said "Water Bottle".
+
+One detail: `FreeCAD.ActiveDocument` might be None if no document is open. The code handles this by creating a new one if `doc is None`.
+However, `doc = FreeCAD.ActiveDocument` is assigned. Then `if doc is None:` creates a new one. This looks correct.
+
+The indentation error is the main thing to fix.
+
+Also, `FreeCADGui.SendMsgToActiveView("ViewFit")` might be needed to fit the camera, as requested ("ensure the final code includes code to fit the view").
+
+Let's write the corrected code.
+
+```python
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+
+# 1. Clean up current view (optional but helpful for a standalone script)
+doc = FreeCAD.ActiveDocument
+if doc is None:
+    doc = FreeCAD.newDocument()
+
+# Clear existing to avoid clutter
+for obj in doc.Objects:
+    doc.removeObject(obj.Name)
+
+# 2. Define dimensions
+body_r = 30
+body_h = 120
+neck_r = 15
+neck_h = 30
+cap_r = 16
+cap_h = 20
+
+# 3. Create geometry
+# Body
+body = Part.makeCylinder(body_r, body_h)
+
+# Neck
+neck = Part.makeCylinder(neck_r, neck_h)
+neck.translate(FreeCAD.Vector(0, 0, body_h))
+
+# Cap
+cap = Part.makeCylinder(cap_r, cap_h)
+cap.translate(FreeCAD.Vector(0, 0, body_h + neck_h))
+
+# Combine
+bottle_shape = body.fuse(neck).fuse(cap)
+
+# 4. Show
+obj = doc.addObject("Part::Feature", "WaterBottle")
+obj.Shape = bottle_shape
+doc.recompute()
+
+# 5. View settings
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+```
+
+Wait, checking the user's failed code again. The user's code actually has `import FreeCAD` at the start without indent, but the next lines have indentation. This is definitely the syntax error.
+
+One minor thing: `doc.removeObject(obj.Name)` might fail if objects are deleted while iterating, or if the list changes size. It's safer to iterate over a copy or use `clear` (but `clear` might not exist on `Objects` depending on version, actually in FreeCAD Python API `doc.removeObject` removes it from the document, but modifying a list while iterating is bad).
+However, for a simple script, usually `for obj in doc.Objects:` is fine *if* we iterate a copy or iterate backwards, but FreeCAD's `Objects` might be a list.
+Actually, the standard way in FreeCAD macros to clear the document is:
+```python
+for obj in doc.Objects:
+    doc.removeObject(obj.Name)
+```
+Wait, if I remove `obj`, the list `doc.Objects` changes. Python will throw "list changed size during iteration".
+Better approach:
+```python
+for obj in doc.Objects[:]:
+    doc.removeObject(obj.Name)
+```
+Or just don't clear it if it's a fresh document, but the user's code tries to clear it. I will fix this to be robust.
+
+Also, in FreeCAD, when creating a new document, it usually becomes the active document. But accessing `FreeCADGui` might fail if run in console without GUI, but the user asked for view settings so GUI is assumed.
+
+Let's double check the indentation in the prompt's error.
+`import Part` is indented under `import FreeCAD`.
+The fix is trivial: remove the leading spaces from `import Part` and `import math`.
+
+I will generate the corrected macro.
+
+One aesthetic improvement: A water bottle usually has a slightly narrower neck. The code uses cylinders, which is fine for a basic shape. I'll stick to the user's logic but fix the syntax.
+
+Final check on the code structure:
+- Imports
+- Document handling
+- Dimensions
+- Shapes
+- Boolean fuse
+- Add Object
+- View Fit/Isometric
+
+The error "unexpected indent" was on line 2, which corresponds to `import Part` in the user snippet having 4 spaces.
+
+I will provide the clean, executable Python code.
+
+One thing to note: `FreeCAD.ActiveDocument` vs `FreeCAD.doc`. The user code uses `doc`. I'll keep using `doc`.
+
+Also, `FreeCADGui.SendMsgToActiveView("ViewFit")` is correct.
+
+Let's write the final code.
+
+```python
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+
+# 1. Get or create document
+doc = FreeCAD.ActiveDocument
+if doc is None:
+    doc = FreeCAD.newDocument()
+
+# Clear existing objects to avoid clutter
+for obj in doc.Objects[:]:
+    doc.removeObject(obj.Name)
+
+# 2. Define dimensions
+body_r = 30
+body_h = 120
+neck_r = 15
+neck_h = 30
+cap_r = 16
+cap_h = 20
+
+# 3. Create geometry
+# Body
+body = Part.makeCylinder(body_r, body_h)
+
+# Neck
+neck = Part.makeCylinder(neck_r, neck_h)
+neck.translate(FreeCAD.Vector(0, 0, body_h))
+
+# Cap
+cap = Part.makeCylinder(cap_r, cap_h)
+cap.translate(FreeCAD.Vector(0, 0, body_h + neck_h))
+
+# Combine
+bottle_shape = body.fuse(neck).fuse(cap)
+
+# 4. Show
+obj = doc.addObject("Part::Feature", "WaterBottle")
+obj.Shape = bottle_shape
+doc.recompute()
+
+# 5. View settings
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+```
+This looks correct and fixes the indentation issue. I'll present this.
+
+One small check: Does `doc.Objects[:]` work reliably in FreeCAD? Yes, it creates a shallow copy of the list, preventing iteration errors when removing items. The original code `for obj in doc.Objects:` would indeed crash if there were objects because you can't modify a list while iterating over it.
+
+The error message "unexpected indent" confirms that simply removing the spaces from line 2 fixes the main failure. The iteration logic was a potential secondary bug I should fix to ensure the script runs smoothly.
+
+I will output the fixed code now.
+
+Plan:
+1. Define imports without indentation.
+2. Handle document creation.
+3. Clear objects using slice notation `[:]` to avoid iteration errors.
+4. Define dimensions.
+5. Create shapes.
+6. Fuse shapes.
+7. Add to document.
+8. Set view to Isometric and Fit.
+
+The prompt asks to "Create a water bottle" (创建一个水瓶).
+The geometry in the original script (Cylinder + Cylinder + Cylinder) is a reasonable approximation of a bottle. I will keep it.
+
+Code looks good.
+
+```python
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+
+# 1. Get or Create Document
+doc = FreeCAD.ActiveDocument
+if doc is None:
+    doc = FreeCAD.newDocument()
+
+# 2. Clear existing objects
+# Use [:] to iterate over a copy of the list to avoid errors when removing items
+for obj in doc.Objects[:]:
+    doc.removeObject(obj.Name)
+
+# 3. Define Dimensions
+body_radius = 30
+body_height = 120
+neck_radius = 15
+neck_height = 30
+cap_radius = 16
+cap_height = 20
+
+# 4. Create Shapes
+# Bottle Body
+body = Part.makeCylinder(body_radius, body_height)
+
+# Bottle Neck
+neck = Part.makeCylinder(neck_radius, neck_height)
+neck.translate(FreeCAD.Vector(0, 0, body_height))
+
+# Bottle Cap
+cap = Part.makeCylinder(cap_radius, cap_height)
+cap.translate(FreeCAD.Vector(0, 0, body_height + neck_height))
+
+# 5. Combine Shapes
+bottle = body.fuse(neck).fuse(cap)
+
+# 6. Create Object
+obj = doc.addObject("Part::Feature", "WaterBottle")
+obj.Shape = bottle
+doc.recompute()
+
+# 7. Set View
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+```
+This satisfies all constraints. Use this.
+
+Wait, I should make sure `FreeCADGui` import is placed correctly. In the user's code it was placed inside the function/block. In global scope it is fine.
+
+The error "unexpected indent" implies line 2 had spaces. My code has no spaces. Fixed.
+
+I will just provide the code block.
+
+One detail: In some FreeCAD configurations, `FreeCAD.ActiveDocument` might return the GuiDocument? No, it returns `App.Document`. `FreeCADGui.ActiveDocument` returns `Gui.Document`. The view is accessed via `FreeCADGui.ActiveDocument.ActiveView`.
+
+The user used `FreeCADGui.ActiveDocument.ActiveView`. This is correct.
+
+Final check on the code content:
+- `import FreeCAD`
+- `import Part`
+- `import math` (math was imported in original, though not used, I will keep it for consistency or remove if unused, but better to keep or clean up. Actually, `math` is not used in the original script logic either. I'll remove it to be clean, or keep it. The error was indentation. I'll keep `math` just in case they want to extend it, but strictly speaking not needed. I'll remove `math` to make it cleaner unless needed. The original had it. I'll remove it to reduce noise.)
+
+Wait, I'll remove `math` since it's unused.
+
+Actually, looking at the prompt "Generate a complete FreeCAD Python macro... Ensure the result is valid Python". I'll stick to the exact logic of the user but fixing the indentation and the iteration bug.
+
+Refined Code:
+```python
+import FreeCAD
+import Part
+import FreeCADGui
+
+# 1. Handle Document
+doc = FreeCAD.ActiveDocument
+if doc is None:
+    doc = FreeCAD.newDocument()
+
+# 2. Clear Objects (iterate over copy to avoid modification errors)
+for obj in doc.Objects[:]:
+    doc.removeObject(obj.Name)
+
+# 3. Dimensions
+body_r = 30
+body_h = 120
+neck_r = 15
+neck_h = 30
+cap_r = 16
+cap_h = 20
+
+# 4. Create Geometry
+body = Part.makeCylinder(body_r, body_h)
+neck = Part.makeCylinder(neck_r, neck_h)
+neck.translate(FreeCAD.Vector(0, 0, body_h))
+cap = Part.makeCylinder(cap_r, cap_h)
+cap.translate(FreeCAD.Vector(0, 0, body_h + neck_h))
+
+# 5. Fuse and Show
+bottle_shape = body.fuse(neck).fuse(cap)
+obj = doc.addObject("Part::Feature", "WaterBottle")
+obj.Shape = bottle_shape
+doc.recompute()
+
+# 6. View
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+```
+This looks perfect. I will output this.
+
+One tiny detail: The original code had `import FreeCAD` then indented `import Part`. This is the error. I must ensure no indentation at the start of the lines.
+
+I will provide the code now.
+</think>
+
+Here is the corrected macro. The main issue in your previous attempt was the indentation of the `import` statements (lines 2 and 3 were indented, which caused a syntax error in Python). I also fixed a potential error when clearing objects by iterating over a copy of the list (`[:]`).
+
+```python
+import FreeCAD
+import Part
+import FreeCADGui
+
+# 1. Get or Create Document
+doc = FreeCAD.ActiveDocument
+if doc is None:
+    doc = FreeCAD.newDocument()
+
+# 2. Clear existing objects (iterate over a copy [:] to avoid list modification errors)
+for obj in doc.Objects[:]:
+    doc.removeObject(obj.Name)
+
+# 3. Define dimensions
+body_r = 30
+body_h = 120
+neck_r = 15
+neck_h = 30
+cap_r = 16
+cap_h = 20
+
+# 4. Create geometry
+# Body
+body = Part.makeCylinder(body_r, body_h)
+
+# Neck
+neck = Part.makeCylinder(neck_r, neck_h)
+neck.translate(FreeCAD.Vector(0, 0, body_h))
+
+# Cap
+cap = Part.makeCylinder(cap_r, cap_h)
+cap.translate(FreeCAD.Vector(0, 0, body_h + neck_h))
+
+# 5. Combine shapes
+bottle_shape = body.fuse(neck).fuse(cap)
+
+# 6. Create object in FreeCAD
+obj = doc.addObject("Part::Feature", "WaterBottle")
+obj.Shape = bottle_shape
+doc.recompute()
+
+# 7. Set view to Isometric and fit to screen
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+```

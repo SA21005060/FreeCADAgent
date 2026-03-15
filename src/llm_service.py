@@ -1,6 +1,7 @@
 """LLM服务模块"""
 
 from src.llm import AgentsLLM
+from typing import Optional
 # from src.config import get_settings
 
 # 全局LLM实例

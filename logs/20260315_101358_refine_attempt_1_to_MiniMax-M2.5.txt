@@ -1,0 +1,83 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+    import Part
+    import Sketcher
+    import PartDesign
+
+    # Create Document
+    doc = FreeCAD.newDocument("Vase")
+    App.setActiveDocument("Vase")
+    App.ActiveDocument = App.getDocument("Vase")
+    Gui.ActiveDocument = Gui.getDocument("Vase")
+
+    # Create Body
+    body = App.ActiveDocument.addObject('PartDesign::Body', 'Body')
+
+    # Create Sketch (Profile)
+    sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'Sketch')
+    sketch.Support = App.ActiveDocument.XY_Plane
+    sketch.MapMode = 'FlatFace'
+
+    # Define Vase Profile Points (Radius, Height)
+    # We draw half of the vertical cross-section
+    # x = radius, y = height
+    # Using lines to form the silhouette
+    points = [
+        FreeCAD.Vector(0, 0, 0),       # Bottom center
+        FreeCAD.Vector(20, 0, 0),      # Bottom edge
+        FreeCAD.Vector(45, 25, 0),     # Belly
+        FreeCAD.Vector(15, 60, 0),     # Neck
+        FreeCAD.Vector(22, 75, 0),     # Rim flare
+        FreeCAD.Vector(0, 75, 0)       # Top center
+    ]
+
+    # Add geometry to sketch (Lines)
+    # We create line segments connecting these points
+    for i in range(len(points) - 1):
+        line = Part.LineSegment(points[i], points[i+1])
+        sketch.addGeometry(line)
+
+    # Add constraints to make it a closed loop?
+    # Actually, for a revolution, it doesn't strictly need to be a closed loop if we define the axis,
+    # but it's good practice. However, since we drew lines from center to edge, we are fine.
+    # Let's just add a Coincidence constraint to close the loop to the axis if needed,
+    # but points[0] and points[-1] are both on X=0.
+    # Actually, let's just use the Revolution feature which handles the axis.
+
+    doc.recompute()
+
+    # Create Revolution
+    revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+    revolution.Profile = sketch
+    revolution.Angle = 360.0
+    revolution.Axis = (0, 1, 0) # Z-axis in sketch is actually Y in 3D? No, Sketch is XY, so Z is normal.
+    # Wait, Sketch is on XY plane. Axis of revolution should be the vertical axis in the sketch (Y axis).
+    # (0, 1, 0) corresponds to the Y axis of the sketch.
+    revolution.ReferenceAxis = (sketch, 'N_Axis')
+
+    # Set Appearance (Color)
+    revolution.ViewObject.ShapeColor = (0.8, 0.4, 0.3) # Terracotta color
+
+    doc.recompute()
+
+    # Fit View
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.activeDocument().activeView().viewIsometric()
+```
+
+**Error Message**:
+unexpected indent (<unknown>, line 2)
+
+**User's instruction was**:
+创建一个花瓶
+
+**Selection Info**:
+No selection

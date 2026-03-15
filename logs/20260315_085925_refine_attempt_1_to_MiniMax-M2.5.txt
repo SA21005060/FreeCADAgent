@@ -1,0 +1,143 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+import Mesh
+
+# ==========================================
+# 1. 创建新文档
+# ==========================================
+App.newDocument("CartoonRobot")
+App.setActiveDocument("CartoonRobot")
+Gui.activeDocument().activeView().viewDefault()
+
+# 定义一些颜色 (R, G, B, Alpha)
+# 范围是 0.0 到 1.0
+col_body = (0.2, 0.6, 0.8, 0.0)  # 蓝色身体
+col_head = (0.9, 0.9, 0.9, 0.0)  # 浅灰色头部
+col_eye = (1.0, 1.0, 1.0, 0.0)   # 白色眼睛
+col_pupil = (0.0, 0.0, 0.0, 0.0) # 黑色眼珠
+col_antenna = (0.8, 0.2, 0.2, 0.0) # 红色天线
+
+# ==========================================
+# 2. 构建身体 (Body)
+# ==========================================
+body_height = 20
+body_radius = 10
+shape_body = Part.makeCylinder(body_radius, body_height)
+
+# 创建 FreeCAD 对象
+obj_body = FreeCAD.ActiveDocument.addObject("Part::Feature", "Body")
+obj_body.Shape = shape_body
+obj_body.ViewObject.ShapeColor = col_body
+obj_body.Placement.Base = FreeCAD.Vector(0, 0, 0)
+
+# ==========================================
+# 3. 构建头部 (Head)
+# ==========================================
+head_radius = 8
+shape_head = Part.makeSphere(head_radius)
+
+obj_head = FreeCAD.ActiveDocument.addObject("Part::Feature", "Head")
+obj_head.Shape = shape_head
+obj_head.ViewObject.ShapeColor = col_head
+# 将头部移动到身体上方
+obj_head.Placement.Base = FreeCAD.Vector(0, body_height/2 + head_radius - 2, 0)
+
+# ==========================================
+# 4. 构建眼睛 (Eyes)
+# ==========================================
+# 左眼
+shape_eyeL = Part.makeSphere(2.5)
+obj_eyeL = FreeCAD.ActiveDocument.addObject("Part::Feature", "EyeL")
+obj_eyeL.Shape = shape_eyeL
+obj_eyeL.ViewObject.ShapeColor = col_eye
+# 计算位置：头部位置 + 偏移
+offset = head_radius - 1.5
+obj_eyeL.Placement.Base = FreeCAD.Vector(-3.5, body_height/2 + head_radius + 1, offset)
+
+# 右眼
+shape_eyeR = Part.makeSphere(2.5)
+obj_eyeR = FreeCAD.ActiveDocument.addObject("Part::Feature", "EyeR")
+obj_eyeR.Shape = shape_eyeR
+obj_eyeR.ViewObject.ShapeColor = col_eye
+obj_eyeR.Placement.Base = FreeCAD.Vector(3.5, body_height/2 + head_radius + 1, offset)
+
+# 左眼珠 (Pupil)
+shape_pupilL = Part.makeSphere(1)
+obj_pupilL = FreeCAD.ActiveDocument.addObject("Part::Feature", "PupilL")
+obj_pupilL.Shape = shape_pupilL
+obj_pupilL.ViewObject.ShapeColor = col_pupil
+obj_pupilL.Placement.Base = FreeCAD.Vector(-3.5, body_height/2 + head_radius + 1, offset + 1.5)
+
+# 右眼珠
+shape_pupilR = Part.makeSphere(1)
+obj_pupilR = FreeCAD.ActiveDocument.addObject("Part::Feature", "PupilR")
+obj_pupilR.Shape = shape_pupilR
+obj_pupilR.ViewObject.ShapeColor = col_pupil
+obj_pupilR.Placement.Base = FreeCAD.Vector(3.5, body_height/2 + head_radius + 1, offset + 1.5)
+
+# ==========================================
+# 5. 构建天线 (Antenna)
+# ==========================================
+# 天线杆
+shape_antStick = Part.makeCylinder(0.5, 10)
+obj_antStick = FreeCAD.ActiveDocument.addObject("Part::Feature", "AntennaStick")
+obj_antStick.Shape = shape_antStick
+obj_antStick.ViewObject.ShapeColor = (0.5, 0.5, 0.5, 0.0)
+obj_antStick.Placement.Base = FreeCAD.Vector(0, body_height/2 + head_radius + head_radius - 2, 0)
+
+# 天线球
+shape_antBall = Part.makeSphere(1.5)
+obj_antBall = FreeCAD.ActiveDocument.addObject("Part::Feature", "AntennaBall")
+obj_antBall.Shape = shape_antBall
+obj_antBall.ViewObject.ShapeColor = col_antenna
+obj_antBall.Placement.Base = FreeCAD.Vector(0, body_height/2 + head_radius + head_radius + 6, 0)
+
+# ==========================================
+# 6. 构建手臂 (Arms)
+# ==========================================
+# 左手
+shape_armL = Part.makeCylinder(2, 10)
+obj_armL = FreeCAD.ActiveDocument.addObject("Part::Feature", "ArmL")
+obj_armL.Shape = shape_armL
+obj_armL.ViewObject.ShapeColor = col_body
+# 旋转并移动
+import FreeCAD
+rot = FreeCAD.Rotation(FreeCAD.Vector(0,0,1), 90)
+obj_armL.Placement = FreeCAD.Placement(FreeCAD.Vector(-12, 5, 0), rot)
+
+# 右手
+shape_armR = Part.makeCylinder(2, 10)
+obj_armR = FreeCAD.ActiveDocument.addObject("Part::Feature", "ArmR")
+obj_armR.Shape = shape_armR
+obj_armR.ViewObject.ShapeColor = col_body
+rot = FreeCAD.Rotation(FreeCAD.Vector(0,0,1), -90)
+obj_armR.Placement = FreeCAD.Placement(FreeCAD.Vector(12, 5, 0), rot)
+
+# ==========================================
+# 7. 刷新视图并设置视角
+# ==========================================
+Gui.activeDocument().activeView().fitAll()
+Gui.activeDocument().activeView().viewIsometric()
+
+# 提示完成
+print("卡通角色已创建完成！")
+```
+
+**Error Message**:
+name 'App' is not defined
+
+**User's instruction was**:
+创建一个卡通人物
+
+**Selection Info**:
+Object: MyBox

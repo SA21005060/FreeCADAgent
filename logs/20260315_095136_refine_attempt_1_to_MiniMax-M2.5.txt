@@ -1,0 +1,63 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+    import Part
+    import Draft
+    import math
+
+    # 1. Create Document
+    App.newDocument("Kettle")
+    App.setActiveDocument("Kettle")
+    App.ActiveDocument = App.getDocument("Kettle")
+    Gui.ActiveDocument = App.getDocument("Kettle")
+
+    # 2. Create Main Body (Cylinder)
+    # Center at 0,0,0. Radius 40, Height 100.
+    body = App.ActiveDocument.addObject("Part::Cylinder", "Body")
+    body.Radius = 40
+    body.Height = 100
+
+    # 3. Create Spout (Cylinder)
+    # Positioned on the side, angled up.
+    spout = App.ActiveDocument.addObject("Part::Cylinder", "Spout")
+    spout.Radius = 10
+    spout.Height = 40
+    spout.Placement = App.Placement(App.Vector(40, 0, 40), App.Rotation(App.Vector(1, 0, 0), -45)) 
+    # Wait, rotating around 1,0,0 tilts it in Y. Let's adjust.
+    # We need to move it out, then rotate.
+    spout.Placement = App.Placement(App.Vector(40, 0, 30), App.Rotation(App.Vector(1, 0, 0), -45))
+
+    # 4. Create Handle (Torus + Cylinder cutouts or just a Torus segment)
+    # Let's use a Torus for the handle loop.
+    # Major radius 35, Minor radius 5.
+    handle = App.ActiveDocument.addObject("Part::Torus", "Handle")
+    handle.Radius1 = 35 # Major
+    handle.Radius2 = 6  # Minor
+    # We need to slice the torus or position it so it looks like a handle.
+    # Let's just use a U-shaped extrusion. It's harder to code quickly.
+    # Alternative: A hollow cylinder (Tube).
+    # Let's stick to a simple Torus rotated 90 deg so the hole fits the body.
+
+    # REVISION: The user wants a "Water Kettle" (Teapot style or Electric).
+    # Let's make it look a bit more organic.
+    # Body: Sphere + Cylinder? Or just a Revolve.
+
+    # Let's use the Draft Workbench features for easier shape chaining? 
+    # No, keep it pure Part workbench for stability.
+```
+
+**Error Message**:
+unexpected indent (<unknown>, line 2)
+
+**User's instruction was**:
+创建一个水壶
+
+**Selection Info**:
+No selection

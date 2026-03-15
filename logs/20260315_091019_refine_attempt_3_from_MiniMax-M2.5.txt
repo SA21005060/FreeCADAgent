@@ -1,0 +1,374 @@
+<think>
+The user wants me to fix a FreeCAD Python macro that creates a vase (花瓶).
+The previous attempt failed with the error: `name 'App' is not defined`.
+Looking at the provided code, I see `App.setActiveDocument("Vase")` and `App.ActiveDocument = ...` but the module `App` is not imported.
+In FreeCAD Python macros, `FreeCAD` is usually imported as `import FreeCAD`.
+The `App` and `Gui` objects are typically available in the FreeCAD Python console automatically, but when running a script, they often need to be accessed via `FreeCAD.App` and `FreeCAD.Gui` or by importing them explicitly if the environment supports it.
+However, the standard way in a standalone script is to import `FreeCAD` and access `FreeCAD.App` and `FreeCAD.Gui`. Or, specifically for the console context, users often use `import FreeCAD, FreeCADGui, Draft`. But usually, just importing FreeCAD is enough to access `FreeCAD.App` if the script is run internally. Wait, standard macro execution environment in FreeCAD provides `App` and `Gui` as global variables if the "Macro" tab is used? No, usually you have to import them or use the `FreeCAD.` prefix.
+Actually, in the standard FreeCAD macro editor, `FreeCAD` and `Gui` (FreeCADGui) are often pre-imported or available if imported. But the error says `name 'App' is not defined`.
+
+Let's check the lines:
+`App.setActiveDocument("Vase")`
+`App.getDocument("Vase")`
+`App.ActiveDocument`
+
+These lines assume `App` is in the namespace.
+The fix is to import `App` from `FreeCAD` or use `FreeCAD.App`.
+Usually, it's safer to import them explicitly:
+`import FreeCAD as App`
+or
+`from FreeCAD import App, Gui`
+
+Let's look at the logic of the script itself.
+1. It creates a document "Vase".
+2. Defines vectors.
+3. Creates a BSpline curve using `.interpolate`.
+4. Creates lines to close the profile.
+5. Makes a Wire.
+6. Makes a Face.
+7. Revolves the face around the Y-axis (vertical).
+8. Adds object.
+9. Recomputes.
+10. Sets view.
+
+Potential issues in the geometry logic:
+- `curve.interpolate([p1, p2, p3, p4, p5])`: This fits a curve through points. p1 is (0,0,0). p6 is (0,28,0).
+- The wire consists of: curve (p1 to p5), line_top (p5 to p6), line_axis (p6 to p1).
+- `p1` is at y=0. `p6` is at y=28.
+- The axis of revolution is defined as `p1` (0,0,0) and direction `FreeCAD.Vector(0,1,0)` (Y-axis).
+- If the profile lies on the XY plane (Z=0), and we revolve around the Y axis passing through p1 (0,0,0), we need to ensure the profile is strictly on one side of the axis and touches it at p1.
+- The profile goes from p1 (0,0) outwards in X.
+- p6 is (0, 28, 0). This is the "center" point at the top.
+- The wire goes p1 -> ... -> p5 -> p6 -> p1. This forms a closed loop.
+- However, `p6` is (0,28,0). The axis is the Y axis (x=0, z=0).
+- Wait, the axis of revolution is the line passing through `p1` with direction (0,1,0). This is the Y axis.
+- If we revolve a shape around the Y axis, the shape must be in the XY plane (or XZ plane depending on axis).
+- The profile is in XY plane.
+- Is the axis passing through p1 correct?
+- p1 is (0,0,0). The axis is the Y axis.
+- Usually for a vase, we revolve around the central axis (Y axis).
+- The profile is defined by Radius (X) and Height (Y).
+- p1 is bottom center. p2 is bottom edge. ... p5 is top rim edge. p6 is top center.
+- This seems correct for a lathe operation.
+
+Let's check the imports.
+The error is definitely `App` not defined.
+I will add `from FreeCAD import App, Gui` or just import FreeCAD and use FreeCAD.App/Gui.
+The standard template usually looks like:
+```python
+import FreeCAD
+import Part
+import math
+
+# code
+```
+If I run this in the console, `App` and `Gui` are available as globals. But in a `.py` file run by the python interpreter inside FreeCAD, they might not be.
+However, in the "Macro" editor, `FreeCAD` is implicitly available? No, usually you import it.
+But the previous script had `import FreeCAD`. So `FreeCAD` is the object.
+The error is `name 'App' is not defined`.
+So I should use `FreeCAD.App` or `from FreeCAD import App`.
+Let's use `import FreeCAD` and prefix everything with `FreeCAD.` or `App.` if I import it.
+The cleanest way for macros is often:
+`import FreeCAD as App`
+`import Gui as Gui` (or `import FreeCADGui as Gui`)
+Let's check if `FreeCADGui` is available in the namespace. The user provided code has `Gui.ActiveDocument`.
+So I will modify the import section to:
+```python
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+```
+And then replace `App` with `FreeCAD.App` or import it.
+The easiest fix is to add `from FreeCAD import App, Gui` at the top.
+Also, checking the geometry construction:
+`Part.BSplineCurve().interpolate(...)` returns a curve.
+`curve.toShape()` converts to shape.
+`Part.makeLine` creates lines.
+`Part.Wire` takes a list of edges.
+`Part.Face` takes a wire.
+`revolve` takes center, axis, angle.
+One specific issue: `curve.interpolate`. Does it handle the p1->p5 order correctly? Yes.
+Is the wire construction order correct?
+Curve goes p1 -> p2 -> p3 -> p4 -> p5.
+Line p5 -> p6.
+Line p6 -> p1.
+This is a closed loop. Yes.
+
+Wait, `revolve` axis.
+`profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)`
+`p1` is the center point (0,0,0).
+Direction is (0,1,0) (Y axis).
+This creates a solid. Note that since the profile includes the axis line (p6->p1), it might create a singularity (zero thickness at the axis), but usually Part/Revolve handles this or creates a solid with a spike. To be safe, sometimes we leave a tiny gap or ensure the axis is excluded if we want a hollow shell, but standard vase is a solid.
+However, if the profile is "watertight", revolve works best.
+
+Let's fix the `App` error.
+
+Plan:
+1. Add imports: `from FreeCAD import App, Gui`.
+2. Keep the rest of the logic.
+3. Ensure `FreeCAD.newDocument` is called correctly. `FreeCAD.newDocument("Vase")` returns a document object. We should assign it to `doc` or use `App.ActiveDocument`.
+4. The user's code had `App.setActiveDocument("Vase")`. This sets the document named "Vase" as active. This is good.
+
+Revised Imports:
+```python
+import FreeCAD
+import Part
+import math
+from FreeCAD import App, Gui
+```
+
+Let's verify the `revolve` axis again.
+If we revolve around the Y axis (0,1,0) passing through (0,0,0), and the profile is in the XY plane.
+The profile has points with Z=0.
+So the shape will be symmetric around Y.
+This is correct.
+
+One detail: `curve.interpolate` needs points.
+`[p1, p2, p3, p4, p5]` are `FreeCAD.Vector`.
+This looks correct.
+
+I will generate the corrected macro.
+
+```python
+import FreeCAD
+import Part
+import math
+from FreeCAD import App, Gui
+
+# 1. Create Document
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+
+# 2. Define Profile Points (Radius, Height)
+# X is radius, Y is height, Z is 0
+p1 = FreeCAD.Vector(0, 0, 0)
+p2 = FreeCAD.Vector(2, 0, 0)
+p3 = FreeCAD.Vector(7, 10, 0) # Widest point
+p4 = FreeCAD.Vector(3, 20, 0) # Neck
+p5 = FreeCAD.Vector(4.5, 28, 0) # Rim flare
+p6 = FreeCAD.Vector(0, 28, 0) # Close shape at top (Center axis)
+
+# 3. Create the profile curve (Spline)
+curve = Part.BSplineCurve()
+curve.interpolate([p1, p2, p3, p4, p5])
+
+# 4. Create closing lines
+line_top = Part.makeLine(p5, p6)
+line_axis = Part.makeLine(p6, p1)
+
+# 5. Create a Wire (Profile)
+# Ensure order is continuous: Curve (p1->p5), Top (p5->p6), Axis (p6->p1)
+profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+# 6. Create a Face (needed for revolution)
+profile_face = Part.Face(profile_wire)
+
+# 7. Revolve (Lathe)
+# Axis: Y-axis (passing through p1)
+vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+# 8. Create Object
+obj = doc.addObject("Part::Feature", "Vase")
+obj.Shape = vase_shape
+
+# 9. Recompute
+doc.recompute()
+
+# 10. Set View
+# App.ActiveDocument = App.getDocument("Vase") # Already active
+Gui.ActiveDocument = Gui.getDocument("Vase")
+Gui.SendMsgToActiveView("ViewFit")
+
+# Set isometric view
+view = Gui.ActiveDocument.ActiveView
+view.viewIsometric()
+```
+
+Wait, in the user's code:
+`App.setActiveDocument("Vase")`
+`App.ActiveDocument = App.getDocument("Vase")`
+`Gui.ActiveDocument = Gui.getDocument("Vase")`
+
+If I import `App` and `Gui` from `FreeCAD`, this will work.
+Also, checking `curve.interpolate`.
+Note: `Part.BSplineCurve` might need `fitPoints` or `approximate` depending on the version, but `interpolate` is the standard "pass through points" method. It should work.
+However, `interpolate` requires the points to be of type `FreeCAD.Vector` or tuples. It accepts a list.
+One potential pitfall: `Part.BSplineCurve().interpolate` sometimes has issues if the points are collinear or if it is a single segment. Here we have 5 points, looks fine.
+
+One cosmetic improvement:
+`doc = FreeCAD.newDocument("Vase")` returns the document.
+`App.setActiveDocument("Vase")` is fine, or `App.setActiveDocument(doc.Name)`.
+The provided code is mostly correct except for the missing import.
+
+Let's double check the error `name 'App' is not defined`.
+This happens because the user script started with `import FreeCAD` but then used `App` directly.
+In FreeCAD's Python console, `App` and `Gui` are default globals.
+In a macro file, they might not be unless imported.
+So the fix is adding `from FreeCAD import App, Gui`.
+
+One more thing:
+The `revolve` function in Part module: `shape.revolve(center, axis, angle)`.
+Arguments: center (Base.Vector), axis (Vector), angle (float in degrees).
+The code uses `profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)`.
+`p1` is `(0,0,0)`. Axis is `(0,1,0)`.
+This is correct.
+
+I will output the fixed code. I will include comments in Chinese as the user instruction was in Chinese ("创建一个花瓶").
+
+One subtle issue with `Part.Wire`:
+If the edges are not connected, it throws an error.
+`curve.toShape()` goes from p1 to p5.
+`line_top` goes from p5 to p6.
+`line_axis` goes from p6 to p1.
+This is a perfect loop. It should work.
+
+Final check on imports:
+The previous code:
+`import FreeCAD`
+`import Part`
+`import math`
+Failed because `App` was used.
+Fix: Add `from FreeCAD import App, Gui`.
+
+Code structure:
+```python
+import FreeCAD
+import Part
+import math
+from FreeCAD import App, Gui
+
+# ... implementation ...
+```
+This is the robust way.
+
+One small detail: `App.setActiveDocument("Vase")`. Since we just created it, it's active. But it's good practice to ensure it.
+Also `Gui.SendMsgToActiveView("ViewFit")` fits the camera to the object. This is good.
+
+The user's error was purely the missing import.
+
+One more thing to check:
+In the generated code, I will ensure I use `FreeCAD.Vector` or just `Vector` if imported?
+The previous code used `FreeCAD.Vector`. I will stick to that or add `from FreeCAD import Vector`. The previous code had `FreeCAD.Vector`, so I will keep it to minimize changes, but I must add the import for `App` and `Gui`.
+
+Actually, looking at standard FreeCAD macros, often people do:
+```python
+import FreeCAD, FreeCADGui, Part, math
+```
+Then use `FreeCAD.Vector`.
+The error was specifically `name 'App' is not defined`, so fixing that is the priority.
+
+I will provide the corrected code.
+
+One detail about the vase shape:
+Sometimes `revolve` fails if the shape is not perfectly closed or if the axis touches the face (singularities).
+Using a profile that includes the axis (like p6 -> p1) often results in a solid with a sharp edge on the axis.
+The profile goes from axis (p1) out to radius (p2..p5) and back to axis (p6).
+This is the standard way to define a solid of revolution.
+It should be fine.
+
+Final Code Plan:
+1. Imports: `FreeCAD`, `Part`, `math`, `App`, `Gui` (explicit or from FreeCAD).
+2. Create Doc.
+3. Points.
+4. Spline.
+5. Lines.
+6. Wire.
+7. Face.
+8. Revolve.
+9. Object.
+10. View.
+
+```python
+import FreeCAD
+import Part
+import math
+from FreeCAD import App, Gui
+
+# ... rest of the code ...
+```
+This is correct.
+
+One note: In the user code, there is `curve.interpolate([p1, p2, p3, p4, p5])`.
+Does `Part.BSplineCurve` need `estimateNbrOfControlPoints` or something?
+Usually `interpolate` works out of the box for simple point sets.
+Also `p1` and `p6` are (0,0,0) and (0,28,0).
+The curve is p1->p5. The lines close back to p1.
+This forms the "slice" of the vase.
+
+I will produce the code now.
+
+The user message includes "Attempt 3" and the error.
+I will provide the code that fixes the error.
+
+The code should be wrapped in the macro format.
+
+```python
+import FreeCAD
+import Part
+import math
+from FreeCAD import App, Gui
+
+# 1. 创建文档 (Create Document)
+doc = FreeCAD.newDocument("Vase")
+App.setActiveDocument("Vase")
+
+# 2. 定义轮廓点 (Define Profile Points)
+# X is radius, Y is height, Z is 0
+p1 = FreeCAD.Vector(0, 0, 0)
+p2 = FreeCAD.Vector(2, 0, 0)
+p3 = FreeCAD.Vector(7, 10, 0) # 最宽点 (Widest point)
+p4 = FreeCAD.Vector(3, 20, 0) # 瓶颈 (Neck)
+p5 = FreeCAD.Vector(4.5, 28, 0) # 边缘 (Rim flare)
+p6 = FreeCAD.Vector(0, 28, 0) # 顶部中心 (Center axis at top)
+
+# 3. 创建轮廓曲线 (Spline)
+curve = Part.BSplineCurve()
+curve.interpolate([p1, p2, p3, p4, p5])
+
+# 4. 创建闭合线 (Closing lines)
+line_top = Part.makeLine(p5, p6)
+line_axis = Part.makeLine(p6, p1)
+
+# 5. 创建线框 (Profile Wire)
+# 顺序: 曲线 (p1->p5), 顶部线 (p5->p6), 轴线 (p6->p1)
+profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+# 6. 创建面 (Face)
+profile_face = Part.Face(profile_wire)
+
+# 7. 旋转 (Revolve)
+# 轴: Y轴 (passing through p1)
+vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+# 8. 创建对象 (Create Object)
+obj = doc.addObject("Part::Feature", "Vase")
+obj.Shape = vase_shape
+
+# 9. 重新计算 (Recompute)
+doc.recompute()
+
+# 10. 设置视图 (Set View)
+Gui.ActiveDocument = Gui.getDocument("Vase")
+Gui.SendMsgToActiveView("ViewFit")
+
+# 设置等轴测视图 (Set isometric view)
+view = Gui.ActiveDocument.ActiveView
+view.viewIsometric()
+```
+This looks complete and correct. I just added the necessary import line.
+
+One minor correction:
+`App.setActiveDocument("Vase")` works, but `doc` is already the object.
+Usually it's better to use `App.setActiveDocument(doc.Name)`.
+However, the string "Vase" matches.
+The error was just the import.
+
+I will output this.
+
+Wait, `Part.BSplineCurve` interpolation might fail if the points are too simple or the degree is not set?
+Usually `interpolate` creates a curve of degree 3 (cubic) by default if there are enough points.
+With 5 points, it should be fine.
+
+Also, note that `p1` and `p
+</think>

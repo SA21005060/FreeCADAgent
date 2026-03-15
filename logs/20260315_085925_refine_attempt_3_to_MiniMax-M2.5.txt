@@ -1,0 +1,129 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 3**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# Create new document
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+
+# Define Colors (R, G, B)
+col_body = (0.2, 0.5, 0.8)   # Blue
+col_head = (0.9, 0.9, 0.9)   # White/Grey
+col_joint = (0.8, 0.8, 0.8)  # Grey
+col_eye = (1.0, 0.8, 0.0)    # Yellow
+col_foot = (0.1, 0.1, 0.1)   # Black
+
+# Helper to set color
+def set_color(obj, color):
+    obj.ViewObject.ShapeColor = color
+
+# --- Geometry ---
+
+# 1. Torso (Box)
+torso = FreeCAD.ActiveDocument.addObject("Part::Box", "Torso")
+torso.Width = 40
+torso.Height = 30
+torso.Depth = 50
+torso.Placement = FreeCAD.Placement(FreeCAD.Vector(-20, -15, 0), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(torso, col_body)
+
+# 2. Head (Box)
+head = FreeCAD.ActiveDocument.addObject("Part::Box", "Head")
+head.Width = 50
+head.Height = 40
+head.Depth = 40
+head.Placement = FreeCAD.Placement(FreeCAD.Vector(-25, -20, 50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(head, col_head)
+
+# 3. Eyes (Cylinders)
+eye1 = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Eye1")
+eye1.Radius = 5
+eye1.Height = 2
+eye1.Placement = FreeCAD.Placement(FreeCAD.Vector(-15, -24, 60), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(eye1, col_eye)
+
+eye2 = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Eye2")
+eye2.Radius = 5
+eye2.Height = 2
+eye2.Placement = FreeCAD.Placement(FreeCAD.Vector(15, -24, 60), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(eye2, col_eye)
+
+# 4. Antenna (Cylinder + Sphere)
+ant_stick = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "AntennaStick")
+ant_stick.Radius = 2
+ant_stick.Height = 20
+ant_stick.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -20, 90), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(ant_stick, col_joint)
+
+ant_ball = FreeCAD.ActiveDocument.addObject("Part::Sphere", "AntennaBall")
+ant_ball.Radius = 6
+ant_ball.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -20, 100), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(ant_ball, col_eye)
+
+# 5. Arms (Cylinders)
+arm_l = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "ArmL")
+arm_l.Radius = 8
+arm_l.Height = 40
+# Rotate 90 deg around Y to make horizontal
+arm_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-50, -10, 20), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(arm_l, col_joint)
+
+arm_r = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "ArmR")
+arm_r.Radius = 8
+arm_r.Height = 40
+arm_r.Placement = FreeCAD.Placement(FreeCAD.Vector(50, -10, 20), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(arm_r, col_joint)
+
+# 6. Legs (Cylinders)
+leg_l = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "LegL")
+leg_l.Radius = 10
+leg_l.Height = 50
+leg_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-15, -10, -25), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(leg_l, col_joint)
+
+leg_r = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "LegR")
+leg_r.Radius = 10
+leg_r.Height = 50
+leg_r.Placement = FreeCAD.Placement(FreeCAD.Vector(15, -10, -25), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(leg_r, col_joint)
+
+# 7. Feet (Boxes)
+foot_l = FreeCAD.ActiveDocument.addObject("Part::Box", "FootL")
+foot_l.Width = 20
+foot_l.Height = 30
+foot_l.Depth = 10
+foot_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-25, -25, -50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(foot_l, col_foot)
+
+foot_r = FreeCAD.ActiveDocument.addObject("Part::Box", "FootR")
+foot_r.Width = 20
+foot_r.Height = 30
+foot_r.Depth = 10
+foot_r.Placement = FreeCAD.Placement(FreeCAD.Vector(5, -25, -50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(foot_r, col_foot)
+
+# --- View Setup ---
+# Fix the error: viewDefault is not a valid function.
+# Use fitAll() and viewIsometric()
+FreeCADGui.ActiveDocument.ActiveView.fitAll()
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+**Error Message**:
+'PrimitivePy' object has no attribute 'Depth'
+
+**User's instruction was**:
+创建一个卡通人物
+
+**Selection Info**:
+Object: MyBox

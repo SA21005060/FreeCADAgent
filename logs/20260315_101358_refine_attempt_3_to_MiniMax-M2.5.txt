@@ -1,0 +1,112 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 3**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# Define App and Gui to avoid NameError
+App = FreeCAD.App
+Gui = FreeCAD.Gui
+
+# Create Document
+doc = App.newDocument("Vase")
+App.setActiveDocument("Vase")
+Gui.ActiveDocument = Gui.getDocument("Vase")
+
+# Create Body
+body = App.ActiveDocument.addObject('PartDesign::Body', 'Body')
+
+# Create Sketch (Profile) attached to the Body
+sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'Sketch')
+body.addObject(sketch)
+
+# Set Sketch Plane (XY Plane)
+sketch.Support = App.ActiveDocument.XY_Plane
+sketch.MapMode = 'FlatFace'
+
+# Define Vase Profile Points (x = radius, y = height)
+# Note: In FreeCAD Sketch, X is horizontal, Y is vertical (height).
+# Z is normal to the plane.
+p1 = FreeCAD.Vector(0, 0, 0)
+p2 = FreeCAD.Vector(20, 0, 0)
+p3 = FreeCAD.Vector(45, 25, 0)
+p4 = FreeCAD.Vector(15, 60, 0)
+p5 = FreeCAD.Vector(22, 75, 0)
+p6 = FreeCAD.Vector(0, 75, 0)
+
+# Add geometry to sketch (Lines)
+# Geo1: p1 -> p2
+line1 = Part.LineSegment(p1, p2)
+geo1 = sketch.addGeometry(line1)
+
+# Geo2: p2 -> p3
+line2 = Part.LineSegment(p2, p3)
+geo2 = sketch.addGeometry(line2)
+
+# Geo3: p3 -> p4
+line3 = Part.LineSegment(p3, p4)
+geo3 = sketch.addGeometry(line3)
+
+# Geo4: p4 -> p5
+line4 = Part.LineSegment(p4, p5)
+geo4 = sketch.addGeometry(line4)
+
+# Geo5: p5 -> p6
+line5 = Part.LineSegment(p5, p6)
+geo5 = sketch.addGeometry(line5)
+
+# Add Constraints
+# 1. Close profile to axis (N_Axis is the vertical axis in sketch, Y-axis)
+# Geo1 Start (Index 1, Point 1) to N_Axis (Index -1)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 1, 1, -1))
+
+# Geo5 End (Index 5, Point 2) to N_Axis (Index -1)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 5, 2, -1))
+
+# 2. Connect lines sequentially
+# Geo1 End (1, 2) to Geo2 Start (2, 1)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 1, 2, 2, 1))
+# Geo2 End (2, 2) to Geo3 Start (3, 1)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 2, 2, 3, 1))
+# Geo3 End (3, 2) to Geo4 Start (4, 1)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 3, 2, 4, 1))
+# Geo4 End (4, 2) to Geo5 Start (5, 1)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 4, 2, 5, 1))
+
+doc.recompute()
+
+# Create Revolution
+revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+revolution.Profile = sketch
+revolution.Angle = 360.0
+revolution.ReferenceAxis = (sketch, 'N_Axis')
+
+# Add revolution to body
+body.addObject(revolution)
+
+# Set Appearance (Color)
+revolution.ViewObject.ShapeColor = (0.8, 0.4, 0.3) # Terracotta
+
+doc.recompute()
+
+# Fit View and set Isometric
+Gui.SendMsgToActiveView("ViewFit")
+Gui.activeDocument().activeView().viewIsometric()
+```
+
+**Error Message**:
+module 'FreeCAD' has no attribute 'App'
+
+**User's instruction was**:
+创建一个花瓶
+
+**Selection Info**:
+No selection

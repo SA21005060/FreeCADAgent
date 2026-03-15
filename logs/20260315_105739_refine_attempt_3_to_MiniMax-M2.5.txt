@@ -1,0 +1,106 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 3**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# --- 1. 初始化 ---
+# 修复 'App' is not defined 错误，定义 App 和 Gui
+App = FreeCAD.App
+Gui = FreeCAD.Gui
+
+# 创建新文档
+doc = App.newDocument("WaterBottle")
+App.setActiveDocument("WaterBottle")
+
+# --- 2. 定义参数 ---
+body_radius = 25.0
+body_height = 80.0
+neck_radius = 12.0
+neck_height = 20.0
+cap_radius = 14.0
+cap_height = 15.0
+
+# --- 3. 创建瓶身 (PartDesign Revolution) ---
+# 创建实体基体
+body = App.ActiveDocument.addObject('PartDesign::Body', 'BottleBody')
+
+# 创建草图 (XY平面)
+sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'BottleProfile')
+sketch.Support = (App.ActiveDocument.XY_Plane, [''])
+sketch.MapMode = 'FlatFace'
+body.addObject(sketch)
+
+# 绘制半剖面轮廓线条
+# 1. 底部: (0,0) -> (r, 0)
+# 2. 瓶身: (r, 0) -> (r, h)
+# 3. 瓶肩: (r, h) -> (rn, h+hn)
+# 4. 瓶口: (rn, h+hn) -> (0, h+hn)
+# 5. 轴心: (0, h+hn) -> (0, 0)
+geoList = []
+geoList.append(Part.LineSegment(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(body_radius, 0, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(body_radius, 0, 0), FreeCAD.Vector(body_radius, body_height, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(body_radius, body_height, 0), FreeCAD.Vector(neck_radius, body_height + neck_height, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(neck_radius, body_height + neck_height, 0), FreeCAD.Vector(0, body_height + neck_height, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(0, body_height + neck_height, 0), FreeCAD.Vector(0, 0, 0)))
+
+sketch.addGeometry(geoList, False)
+
+# 添加约束以闭合轮廓
+# Coincident(GeoId1, PointId1, GeoId2, PointId2) -> PointId: 1=Start, 2=End
+# 连接各线段端点
+sketch.addConstraint(Sketcher.Constraint('Coincident', 0, 2, 1, 1)) # Line0 End -> Line1 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 1, 2, 2, 1)) # Line1 End -> Line2 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 2, 2, 3, 1)) # Line2 End -> Line3 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 3, 2, 4, 1)) # Line3 End -> Line4 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 4, 2, 0, 1)) # Line4 End -> Line0 Start
+
+# 固定底部在原点
+sketch.addConstraint(Sketcher.Constraint('Coincident', 0, 1, -1, 1))
+
+# 创建旋转特征
+revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+revolution.Profile = sketch
+revolution.Axis = (0, 1, 0) # 绕Y轴旋转
+revolution.Angle = 360.0
+body.addObject(revolution)
+
+# --- 4. 创建瓶盖 (Part Cylinder) ---
+cap = App.ActiveDocument.addObject('Part::Cylinder', 'BottleCap')
+cap.Radius = cap_radius
+cap.Height = cap_height
+
+# 修正位置：瓶盖中心位于 (0, body_height + neck_height + cap_height/2, 0)
+# 因为瓶身是沿着Y轴创建的，所以瓶盖也要放在Y轴上
+y_pos = body_height + neck_height + cap_height / 2
+cap.Placement = FreeCAD.Placement(FreeCAD.Vector(0, y_pos, 0), FreeCAD.Rotation(0, 0, 0))
+
+# --- 5. 合并瓶身和瓶盖 ---
+# 使用 Part::Fuse 融合两个形状
+fusion = App.ActiveDocument.addObject('Part::Fuse', 'BottleFusion')
+fusion.Shape = body.Shape.fuse(cap.Shape)
+
+# --- 6. 视图设置 ---
+App.ActiveDocument.recompute()
+
+# 切换到等轴测视图并适应模型
+Gui.SendMsgToActiveView("ViewFit")
+Gui.activeDocument().activeView().viewIsometric()
+```
+
+**Error Message**:
+module 'FreeCAD' has no attribute 'App'
+
+**User's instruction was**:
+创建一个水瓶
+
+**Selection Info**:
+No selection

@@ -1,0 +1,54 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 1**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import FreeCADGui
+
+# ==========================================
+# 1. 定义长方体的尺寸 (单位：mm)
+# ==========================================
+length = 50  # 长度 (X轴方向)
+width = 30   # 宽度 (Y轴方向)
+height = 20  # 高度 (Z轴方向)
+
+# ==========================================
+# 2. 创建长方体对象
+# ==========================================
+# 使用 Part 工作台的几何体功能创建 Box
+box = FreeCAD.ActiveDocument.addObject("Part::Box", "MyBox")
+box.Length = length
+box.Width = width
+box.Height = height
+
+# 确保属性设置后几何体正确生成
+FreeCAD.ActiveDocument.recompute()
+
+# ==========================================
+# 3. 设置视图并适应屏幕
+# ==========================================
+# 获取当前视图对象
+view = FreeCADGui.ActiveDocument.ActiveView
+
+# 设置为等轴测视图 (Isometric View)
+view.viewIsometric()
+
+# 自动缩放视图以完全显示创建的物体
+view.fitAll()
+
+print("长方体已创建，尺寸: {} x {} x {}".format(length, width, height))
+```
+
+**Error Message**:
+'NoneType' object has no attribute 'addObject'
+
+**User's instruction was**:
+创建一个长方体
+
+**Selection Info**:
+No selection

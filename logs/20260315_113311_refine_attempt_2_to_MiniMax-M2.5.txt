@@ -1,0 +1,65 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 2**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+import FreeCADGui
+
+# 1. Get or Create Document
+doc = FreeCAD.ActiveDocument
+if doc is None:
+    doc = FreeCAD.newDocument()
+
+# 2. Clear existing objects
+# Use [:] to iterate over a copy of the list to avoid errors when removing items
+for obj in doc.Objects[:]:
+    doc.removeObject(obj.Name)
+
+# 3. Define Dimensions
+body_radius = 30
+body_height = 120
+neck_radius = 15
+neck_height = 30
+cap_radius = 16
+cap_height = 20
+
+# 4. Create Shapes
+# Bottle Body
+body = Part.makeCylinder(body_radius, body_height)
+
+# Bottle Neck
+neck = Part.makeCylinder(neck_radius, neck_height)
+neck.translate(FreeCAD.Vector(0, 0, body_height))
+
+# Bottle Cap
+cap = Part.makeCylinder(cap_radius, cap_height)
+cap.translate(FreeCAD.Vector(0, 0, body_height + neck_height))
+
+# 5. Combine Shapes
+bottle = body.fuse(neck).fuse(cap)
+
+# 6. Create Object
+obj = doc.addObject("Part::Feature", "WaterBottle")
+obj.Shape = bottle
+doc.recompute()
+
+# 7. Set View
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+FreeCADGui.SendMsgToActiveView("ViewFit")
+```
+
+**Error Message**:
+'CADAssistantPanel' object has no attribute 'confirm_button'
+
+**User's instruction was**:
+创建一个水瓶
+
+**Selection Info**:
+No selection

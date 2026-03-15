@@ -1,0 +1,90 @@
+<think>
+The user wants a FreeCAD Python macro to create a sphere.
+The user provided an attempt that failed due to an indentation error.
+The instruction is in Chinese: "创建一个球" (Create a sphere).
+The previous code had inconsistent indentation (first line indented, others not, or mixed).
+
+**Analysis of the error:**
+The provided code snippet looks like this:
+```python
+import FreeCAD
+    import FreeCADGui
+    # ...
+```
+Line 2 is indented while line 1 is not. Python requires consistent indentation. Usually, top-level code starts at column 0.
+
+**Plan:**
+1.  Fix the indentation in the provided code.
+    *   `import FreeCAD` at column 0.
+    *   `import FreeCADGui` at column 0.
+    *   Comments and code indented by 4 spaces (standard Python style).
+2.  Ensure the logic is sound:
+    *   Create a Part::Sphere.
+    *   Set Radius.
+    *   Recompute.
+    *   ViewFit.
+    *   ViewIsometric.
+
+**Code Construction:**
+```python
+import FreeCAD
+import FreeCADGui
+
+# 1. Create the Sphere
+# We define the radius here (e.g., 10 mm)
+sphere = FreeCAD.ActiveDocument.addObject("Part::Sphere", "MySphere")
+sphere.Radius = 10
+
+# 2. Recompute to update the geometry
+FreeCAD.ActiveDocument.recompute()
+
+# 3. Fit the view to see the whole object
+FreeCADGui.SendMsgToActiveView("ViewFit")
+
+# 4. Set Isometric View
+# viewIsometric() is the standard command for this
+FreeCADGui.ActiveDocument.activeView().viewIsometric()
+```
+
+**Verification:**
+The previous error was "unexpected indent". This happens when a line starts with whitespace while the surrounding block doesn't, or indentation is mixed.
+I will provide the corrected code with standard 4-space indentation.
+
+**Language:**
+The user's prompt is in Chinese, so I should respond in Chinese, providing the corrected code.
+
+**Final Output Generation:**
+Generate the corrected Python macro.
+</think>
+
+这是一个修正后的 FreeCAD Python 宏代码。
+
+之前的代码出现了缩进错误（`import FreeCADGui` 前面有多余的空格）。Python 对缩进有严格的要求，顶层的 `import` 语句必须从第一列开始。
+
+```python
+import FreeCAD
+import FreeCADGui
+
+# 1. 创建球体
+# 定义半径 (例如 10 mm)
+sphere = FreeCAD.ActiveDocument.addObject("Part::Sphere", "MySphere")
+sphere.Radius = 10
+
+# 2. 重新计算以更新几何图形
+FreeCAD.ActiveDocument.recompute()
+
+# 3. 适应视图以查看整个对象
+FreeCADGui.SendMsgToActiveView("ViewFit")
+
+# 4. 设置等轴测视图
+# viewIsometric() 是执行此操作的标准方法
+FreeCADGui.ActiveDocument.activeView().viewIsometric()
+```
+
+**如何运行：**
+1.  打开 FreeCAD。
+2.  转到菜单 **Macro** -> **Macros...**。
+3.  点击 **Create**。
+4.  输入文件名（例如 `CreateSphere`）。
+5.  将上面的代码粘贴到编辑器中。
+6.  按 **F5** 或点击 **Save and Execute** 按钮运行。

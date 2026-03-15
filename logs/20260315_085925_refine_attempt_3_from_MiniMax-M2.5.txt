@@ -1,0 +1,286 @@
+<think>
+The user wants to fix a Python macro for FreeCAD that creates a "Cartoon Robot" (from previous attempts, likely).
+The previous attempt failed with the error: `'PrimitivePy' object has no attribute 'Depth'`.
+This error usually happens when FreeCAD falls back to Python primitives (like `PrimitivePy`) because the C++ object creation failed or wasn't properly exposed, often due to incorrect parameter names or types during object creation via Python API, or sometimes document/transaction issues. However, looking at the specific error `'PrimitivePy' object has no attribute 'Depth'`, it implies that the object created (`MyBox` in the selection info might be a clue, or just the default name if the script failed early) doesn't have a `Depth` property.
+
+Let's look at the code provided in Attempt 3.
+It uses `FreeCAD.ActiveDocument.addObject("Part::Box", "Torso")`.
+In FreeCAD Python API:
+- `Part::Box` has `Length`, `Width`, `Height`. It does *not* have `Depth`.
+- `Part::Cylinder` has `Radius`, `Height`.
+- `Part::Sphere` has `Radius`.
+
+The code uses `torso.Depth = 50`, `torso.Width = 40`, `torso.Height = 30`.
+This is incorrect. A Box in FreeCAD uses `Length` (along X), `Width` (along Y), `Height` (along Z).
+So, `Depth` should be `Length`.
+
+Let's check all primitives:
+1. Box: `Length`, `Width`, `Height`. (Code uses `Depth` instead of `Length`).
+2. Cylinder: `Radius`, `Height`. (Looks correct).
+3. Sphere: `Radius`. (Looks correct).
+
+The error `'PrimitivePy' object has no attribute 'Depth'` strongly suggests that the object was created as a generic primitive or failed to initialize the specific feature because `Depth` isn't a valid property for `Part::Box`, causing the feature to be "partial" or a fallback. However, the standard behavior in FreeCAD for a bad property name is usually a warning or just ignoring it, but if it prevents the geometry generation, it might cause issues. But usually, if you set a non-existent attribute on a FreeCAD object, it doesn't always crash immediately with `PrimitivePy`, it might just stay that way. Wait, if the parameter is wrong, the object might become a generic "Feature" or primitive.
+
+Specifically for `Part::Box`:
+Valid properties: `Length`, `Width`, `Height`.
+
+In the provided code:
+```python
+torso.Width = 40
+torso.Height = 30
+torso.Depth = 50  # <--- ERROR: Should be Length
+```
+
+Wait, let's look at the selection info provided: `Object: MyBox`. This suggests the user might have selected a box created by the script or a default box. The script likely crashed or created invalid shapes.
+
+Also, there is another potential issue: `FreeCAD.newDocument` might not always be clean if not handled right, but usually it's fine. The main error is the property name.
+
+Let's correct the code:
+1.  **Fix Box Dimensions**: Change `Depth` to `Length` for all Boxes (`Torso`, `Head`, `FootL`, `FootR`).
+    - `Torso`: Width=40, Height=30, Length=50.
+    - `Head`: Width=50, Height=40, Length=40.
+    - `FootL`, `FootR`: Width=20, Height=30, Length=10.
+
+2.  **Review Rotation logic**:
+    - `torso.Placement = FreeCAD.Placement(FreeCAD.Vector(-20, -15, 0), ...)`
+      Width=40 -> X goes from -20 to 20. Center is 0. The placement vector (-20, -15, 0) places the origin (center of box usually) at (-20, -15, 0). If the box is centered at origin locally, this is fine.
+    - `head`: Width=50 -> X goes -25 to 25. Vector(-25, -20, 50). This aligns the left face with the torso top. Looks okay.
+    - Eyes: Cylinders. Radius=5, Height=2. Placement at Y=-24 (front of head is Y= -20 - 20 = -40? No, head width is 50 along Y? Wait.
+      Let's check coordinate systems. Usually in FreeCAD:
+      - X: Right
+      - Y: Up (or Forward/Back depending on draft/workbench, but usually Z is vertical in standard Part workbench, but in assembly/workbench it varies. In the code: `torso.Height = 30`. Height usually implies Z axis in FreeCAD (Box dimensions are Length(X), Width(Y), Height(Z)).
+      - Z: Vertical.
+
+    Let's re-verify the code's interpretation of axes vs the object creation parameters.
+    `Part::Box`:
+    - Length: along X.
+    - Width: along Y.
+    - Height: along Z.
+
+    Torso:
+    - Width = 40. This is parameter `Width` (Y-axis).
+    - Height = 30. This is parameter `Height` (Z-axis).
+    - Length = 50. This is parameter `Length` (X-axis).
+
+    In the code:
+    `torso.Width = 40`
+    `torso.Height = 30`
+    `torso.Depth = 50` (Should be `Length`)
+
+    Placement:
+    `FreeCAD.Vector(-20, -15, 0)`
+    If Z=0 is the base, and Height is 30, the box goes from Z=0 to Z=30. The center is at Z=15.
+    If the code intended the robot to stand on the ground at Z=0, the center should be at Z=15.
+    The placement vector has Z=0. So the center is at 0. The box goes from -15 to +15. The feet are at -50 (Z). This implies the robot is floating or the Z-axis is handled differently.
+    Let's stick to the `Depth` -> `Length` fix, as that's the explicit error.
+
+    Fixing the other boxes:
+    Head: `head.Length = 40`, `head.Width = 50`, `head.Height = 40`.
+    FootL: `foot_l.Length = 10`, `foot_l.Width = 20`, `foot_l.Height = 30`. (Mapping old Depth->Length).
+
+3.  **View Setup**:
+    The code at the end uses `viewIsometric()`. In recent FreeCAD versions (v0.21+), `viewIsometric` might be `viewIsometric` method or `show isometric`. The standard way is `ActiveView.setViewType('Isometric')` or `viewIsometric()`. The code `FreeCADGui.ActiveDocument.ActiveView.viewIsometric()` is the standard legacy API, it usually works.
+
+    However, there is a catch with `viewIsometric` in some versions/contexts, but usually it's fine. The prompt specifically asked to "set the isometric view". The previous code had `viewIsometric()`. The error was about `Depth`, so the view code might not have run or failed silently. I will keep it but ensure the document is active.
+
+4.  **Colors**:
+    The colors seem fine.
+
+5.  **The "MyBox" clue**:
+    The user provided "Selection Info: Object: MyBox". This is likely the result of the previous script running partially or the user creating a box. The fix remains changing `Depth` to `Length`.
+
+Let's rewrite the script correcting `Depth` to `Length` (or `Box.Length`).
+
+**Code Plan:**
+1.  Define colors.
+2.  Create `Torso`: Fix `Depth` -> `Length = 50`.
+3.  Create `Head`: Fix `Depth` -> `Length = 40`.
+4.  Eyes: Cylinder. Keep.
+5.  Antenna: Cylinder + Sphere. Keep.
+6.  Arms: Cylinder. Keep.
+7.  Legs: Cylinder. Keep.
+8.  Feet (Boxes): Fix `Depth` -> `Length = 10`.
+9.  View settings.
+
+Wait, is `Depth` ever used in Box?
+Maybe the user confused `Depth` (intuitive) with `Length` (FreeCAD box). Yes, FreeCAD uses Length, Width, Height.
+Length = X size.
+Width = Y size.
+Height = Z size.
+The variable names in the code:
+`torso.Width = 40` (Y)
+`torso.Height = 30` (Z)
+`torso.Depth = 50` (X) -> Should be `Length`.
+
+Let's double check the foot positions.
+`foot_l.Placement = ... Vector(-25, -25, -50)`
+`foot_l.Height = 30`. Z goes from -50 to -20. That's fine (below the legs).
+`foot_l.Depth = 10` (X size) -> `Length = 10`.
+`foot_l.Width = 20` (Y size).
+
+Everything else seems geometrically consistent with the "Cartoon Robot" logic, albeit abstract. The main failure point is the attribute name.
+
+One minor thing: The rotation `FreeCAD.Rotation(0, 0, 0, 1)` is quaternion (x, y, z, w). (0,0,0,1) is identity (no rotation). This is correct for the boxes.
+
+One check on the Cylinder/Arm rotation:
+`FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90)`
+This rotates 90 degrees around Y axis.
+Default cylinder is along Z. Rotating 90 deg around Y makes it along X. This makes horizontal arms. Correct.
+
+Let's construct the final code.
+
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# Create new document
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+
+# Define Colors (R, G, B)
+col_body = (0.2, 0.5, 0.8)   # Blue
+col_head = (0.9, 0.9, 0.9)   # White/Grey
+col_joint = (0.8, 0.8, 0.8)  # Grey
+col_eye = (1.0, 0.8, 0.0)    # Yellow
+col_foot = (0.1, 0.1, 0.1)   # Black
+
+# Helper to set color
+def set_color(obj, color):
+    obj.ViewObject.ShapeColor = color
+
+# --- Geometry ---
+
+# 1. Torso (Box)
+# Fixed: Depth -> Length
+torso = FreeCAD.ActiveDocument.addObject("Part::Box", "Torso")
+torso.Length = 50  # Was Depth
+torso.Width = 40
+torso.Height = 30
+torso.Placement = FreeCAD.Placement(FreeCAD.Vector(-20, -15, 0), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(torso, col_body)
+
+# 2. Head (Box)
+# Fixed: Depth -> Length
+head = FreeCAD.ActiveDocument.addObject("Part::Box", "Head")
+head.Length = 40  # Was Depth
+head.Width = 50
+head.Height = 40
+head.Placement = FreeCAD.Placement(FreeCAD.Vector(-25, -20, 50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(head, col_head)
+
+# 3. Eyes (Cylinders)
+eye1 = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Eye1")
+eye1.Radius = 5
+eye1.Height = 2
+eye1.Placement = FreeCAD.Placement(FreeCAD.Vector(-15, -24, 60), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(eye1, col_eye)
+
+eye2 = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "Eye2")
+eye2.Radius = 5
+eye2.Height = 2
+eye2.Placement = FreeCAD.Placement(FreeCAD.Vector(15, -24, 60), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(eye2, col_eye)
+
+# 4. Antenna (Cylinder + Sphere)
+ant_stick = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "AntennaStick")
+ant_stick.Radius = 2
+ant_stick.Height = 20
+ant_stick.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -20, 90), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(ant_stick, col_joint)
+
+ant_ball = FreeCAD.ActiveDocument.addObject("Part::Sphere", "AntennaBall")
+ant_ball.Radius = 6
+ant_ball.Placement = FreeCAD.Placement(FreeCAD.Vector(0, -20, 100), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(ant_ball, col_eye)
+
+# 5. Arms (Cylinders)
+arm_l = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "ArmL")
+arm_l.Radius = 8
+arm_l.Height = 40
+# Rotate 90 deg around Y to make horizontal
+arm_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-50, -10, 20), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(arm_l, col_joint)
+
+arm_r = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "ArmR")
+arm_r.Radius = 8
+arm_r.Height = 40
+arm_r.Placement = FreeCAD.Placement(FreeCAD.Vector(50, -10, 20), FreeCAD.Rotation(FreeCAD.Vector(0, 1, 0), 90))
+set_color(arm_r, col_joint)
+
+# 6. Legs (Cylinders)
+leg_l = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "LegL")
+leg_l.Radius = 10
+leg_l.Height = 50
+leg_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-15, -10, -25), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(leg_l, col_joint)
+
+leg_r = FreeCAD.ActiveDocument.addObject("Part::Cylinder", "LegR")
+leg_r.Radius = 10
+leg_r.Height = 50
+leg_r.Placement = FreeCAD.Placement(FreeCAD.Vector(15, -10, -25), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(leg_r, col_joint)
+
+# 7. Feet (Boxes)
+# Fixed: Depth -> Length
+foot_l = FreeCAD.ActiveDocument.addObject("Part::Box", "FootL")
+foot_l.Length = 10  # Was Depth
+foot_l.Width = 20
+foot_l.Height = 30
+foot_l.Placement = FreeCAD.Placement(FreeCAD.Vector(-25, -25, -50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(foot_l, col_foot)
+
+foot_r = FreeCAD.ActiveDocument.addObject("Part::Box", "FootR")
+foot_r.Length = 10  # Was Depth
+foot_r.Width = 20
+foot_r.Height = 30
+foot_r.Placement = FreeCAD.Placement(FreeCAD.Vector(5, -25, -50), FreeCAD.Rotation(0, 0, 0, 1))
+set_color(foot_r, col_foot)
+
+# --- View Setup ---
+# Ensure GUI is updated
+FreeCADGui.ActiveDocument.ActiveView.fitAll()
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+I should verify if the `viewIsometric` call is available or if `setViewType` is better.
+In FreeCAD Python:
+`FreeCADGui.ActiveDocument.ActiveView.viewIsometric()` exists in the C++ underlying object usually wrapped. It's generally safe to use. However, sometimes it requires `sendMsg`. The previous code had it, so I will keep it.
+Also, checking `fitAll()`.
+
+The error "PrimitivePy object has no attribute 'Depth'" happens because `Depth` is not a property of `Part::Box`. When you assign a non-existent property, sometimes FreeCAD logs a warning but might not crash, but the geometry computation fails or creates a null shape? No, usually it just ignores it or logs. But wait, `Depth` is a property in other contexts (like Pad Pads?), but for `Part::Box`, it's `Length`. The error likely comes from the GUI trying to access the property or the document recovery.
+
+The fix is definitely changing `Depth` to `Length`.
+
+One detail:
+The placement logic for feet:
+`FootR`: `Vector(5, -25, -50)`. Width=20. Center X is 5. So X ranges from -5 to 15.
+The leg is at X=15.
+It touches the side of the leg.
+If Width is 20, and center is 5.
+Left edge = 5 - 10 = -5.
+Leg center = 15.
+Leg Radius = 10.
+Leg left edge = 5.
+So the foot is to the left of the leg (overlapping by 0? No).
+Leg X: 15. Width 20 (radius 10). Edge is at 5.
+Foot center X: 5. Width 20 (half 10). Edge is at -5.
+They touch at X=5.
+Maybe move foot right a bit to center under leg?
+Leg center X=15. Foot center should be 15.
+`foot_r.Placement` vector X is 5 in the original code.
+Vector(5, -25, -50).
+If I fix the logic, I should probably center them, but I should stick to fixing the crash first. The user didn't ask for a redesign, just to fix the error. However, to make it look like the previous attempt (which likely failed visually or crashed), I'll stick to the parameter name fix.
+
+Actually, the previous code had `foot_r.Placement = ... Vector(5, ...)`
+If the leg is at 15, and radius 10, the leg edge is 25. Foot edge is -5. That's disconnected.
+If I assume the previous code was "okay" conceptually, I'll just fix the `Depth` issue.
+
+Wait, `FreeCAD.newDocument` might fail if there is unsaved data? No, usually it prompts or handles it. But better to ensure the document is fresh.
+
+Final check on "Selection Info: Object: MyBox".
+This implies the script *ran* and created a box named "MyBox" or similar. This confirms `Part::Box` was invoked but failed properties.
+
+Code looks solid. I will
+</think>

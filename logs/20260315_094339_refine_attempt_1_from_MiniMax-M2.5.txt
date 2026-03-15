@@ -1,0 +1,358 @@
+<think>
+The user wants to create a vase in FreeCAD using a Python macro.
+The previous attempt failed with the error: `module 'Part' has no attribute 'BsplineCurve'`.
+
+Let's analyze the error.
+In the failing code:
+```python
+spline_outer = Part.BsplineCurve()
+```
+The error says `Part` doesn't have `BsplineCurve`. This usually happens because the API changed in newer versions of FreeCAD (v0.17+, v0.18, v0.19+) or the way the module is accessed is different.
+Actually, `Part.BsplineCurve` *does* exist in FreeCAD, but sometimes it's hidden or requires a specific import or the object needs to be constructed differently depending on the context (e.g., using the Curve object wrapper).
+However, looking at standard FreeCAD Python API documentation, `Part.BsplineCurve` is a class. If the import `import Part` is correct, it should work.
+Wait, maybe the specific module structure requires `from Part import BsplineCurve` or accessing it via `Part.BSplineCurve` (case sensitivity)? No, usually it's `Part.BsplineCurve`.
+
+Let's double check if there is a typo or if the API behaves differently.
+Actually, looking at the code carefully:
+The user provided code:
+```python
+spline_outer = Part.BsplineCurve()
+spline_outer.interpolate(points_outer)
+```
+If `Part.BsplineCurve` raises `AttributeError`, it implies `BsplineCurve` isn't directly visible on the `Part` module in the specific FreeCAD version running (likely a newer one or specific build).
+
+In newer FreeCAD versions (specifically checking 0.19/1.0), `Part.BsplineCurve` exists but sometimes requires a slightly different approach or it's hidden under `Part.Geom`.
+However, `Part.BsplineCurve` *is* the standard way.
+Wait, let's look at the error again. "module 'Part' has no attribute 'BsplineCurve'".
+Maybe it's `Part.BSplineCurve`? No.
+Maybe the user is running an extremely old version? Unlikely.
+Maybe the user is running a version where `BsplineCurve` is in `Part.Geom`?
+Let's try using `Part.Geom.BSplineCurve` or creating the curve via `Part.Shape` helper methods.
+
+Alternatively, a more robust way to create a vase is to use the `Part.Wire` and `Part.BezierCurve` or just create points and use `Part.makeLoft`.
+The most common and reliable way to create a smooth curve through points in FreeCAD macro is often using `Part.BsplineCurve` or `Part.BezierCurve` if available.
+
+Let's verify if `Part.BsplineCurve` works in standard usage. It usually does.
+However, if the error persists, maybe the `interpolate` function expects specific parameters or the Vector format needs to be `(x, y, z)`. The code uses `FreeCAD.Vector(x, y, z)`, which is correct.
+
+Let's check the documentation for `BsplineCurve` in FreeCAD.
+`import Part`
+`c = Part.BsplineCurve()`
+This should work.
+
+Wait, could it be that the code failed at line `spline_outer = Part.BsplineCurve()`?
+If `Part` module is loaded, it should have it.
+Let's look at the previous macro logic.
+The user is trying to create a vase by revolving a face created by two wires (outer and inner).
+The failure is at the curve creation level.
+
+If `Part.BsplineCurve` is missing, the alternative is using `Part.BezierCurve` or constructing the geometry manually.
+Or perhaps just creating a Polygon and lofting? No, they want smooth.
+
+Let's try a fallback or check if `Part` has `BSplineCurve` (caps)? No.
+
+Actually, in recent FreeCAD versions, `Part.BsplineCurve` is indeed available.
+`import Part`
+`Part.BsplineCurve` -> should work.
+
+Is it possible the user has a naming conflict? Unlikely.
+Is it possible the user needs `from Part import BsplineCurve`?
+
+Let's assume the error is valid for the user's environment or there was a typo in the prompt (though it looks correct in the prompt).
+Wait, I recall that sometimes `interpolate` is a method of the curve object.
+`curve.interpolate(list_of_vectors)` is correct.
+
+Maybe the issue is that `BsplineCurve` is not a class in the `Part` module directly in some specific build, but is in `Part.Geom`.
+Let's try to use `Part.Geom.BSplineCurve`.
+Actually, looking at the error message: "module 'Part' has no attribute 'BsplineCurve'".
+This strongly suggests the attribute is missing.
+
+Let's look at alternative approaches to create the profile.
+1. Use `Part.BezierCurve`? No, that fits points exactly but usually requires fewer control points or specific degrees.
+2. Use `Part.Wire` with `smooth=True`?
+   `Part.makePolygon(points, closed=False)` -> `Part.Wire(edges).makeSmoothed()`? Not standard.
+3. Use `Part.makeLoft` between two wires (circles)? No, user defined points.
+
+Let's try to explicitly construct the geometry.
+`Part.BsplineCurve` is the standard.
+If it fails, maybe the environment is very strict or broken.
+However, I must fix the macro.
+Let's try using `Part.show` to debug? No, user wants fix.
+
+Wait, I see a potential issue in the user's code:
+`points_outer` are defined as `FreeCAD.Vector(radius, height, 0)`.
+In FreeCAD (CAD), usually Z is up. The user uses Z=0. The revolve axis is Z.
+So the profile is drawn in the XY plane.
+Radius = X, Height = Y.
+Then revolve around Z.
+This is correct for a lathe operation.
+
+Let's try to fix the `BsplineCurve` issue.
+Maybe I should use `Part.Geom.BSplineCurve`?
+Or just construct the shape using `Part.BSplineCurve2D`?
+Actually, 2D curves in `Part` are often created via `Part.Geom2d`.
+
+Let's look for a workaround that is guaranteed to work.
+Using `Part.BsplineCurve` is the most "correct" way.
+If `Part.BsplineCurve` is missing (weird), maybe the user needs to upgrade or it's a specific flavor.
+However, as an AI, I should provide code that works.
+I will try:
+`c = Part.BsplineCurve(points_outer)` (Constructor might accept points directly?)
+No, usually `Part.BsplineCurve()` then `.interpolate()`.
+
+Let's check the case sensitivity. `BSplineCurve`?
+The error says `BsplineCurve`.
+Let's check the Python version of FreeCAD.
+In FreeCAD 0.19, `Part.BsplineCurve` exists.
+In FreeCAD 0.16/0.17, it exists.
+
+Wait! I found a potential issue in the provided code.
+In the user's code:
+```python
+spline_outer = Part.BsplineCurve()
+spline_outer.interpolate(points_outer)
+```
+If this fails with `AttributeError`, maybe `Part` is actually the `Part` *object* in the FreeCAD GUI instance, or it's the `Part` *module*. The error says `module 'Part' has no attribute`.
+This confirms `Part` is the module.
+Maybe the user needs to call `FreeCAD.Part`? No.
+
+Let's consider using `Part.BezierCurve` as a simpler alternative? No, it doesn't support interpolation (fitting) easily without calculating control points.
+Actually, there is a `Part.BsplineCurve.toShape` method.
+
+Let's assume the environment might be finicky or it's a typo in the error report (maybe `BspilineCurve`?).
+Wait, I will look at the user's specific points.
+`points_outer` has 6 points.
+`points_inner` has 6 points.
+
+Let's modify the approach slightly to ensure compatibility.
+Instead of `Part.BsplineCurve`, I can try `Part.Geom.BSplineCurve`.
+Or, I can create the curve using the `interpolate` static method if available? No.
+
+Let's try this syntax which is very common in FreeCAD macros:
+```python
+from Part import BsplineCurve
+```
+This might be the fix. Sometimes importing directly helps resolve attributes on the module if there is some weird namespace issue.
+
+However, the user said "Fix it accordingly".
+I will switch to `Part.BsplineCurve` if available, but if not, I'll provide a fallback or assume the user just wants it to work.
+Actually, I suspect the user might be running a version where the `BsplineCurve` class is defined in a submodule like `Part.Geom`.
+Let's check:
+`import Part`
+`hasattr(Part, 'BsplineCurve')` -> usually True.
+
+Let's try a more robust method to create the spline:
+```python
+# Try importing BsplineCurve directly to avoid module attribute issues
+try:
+    from Part import BsplineCurve
+    curve = BsplineCurve()
+    curve.interpolate(points_outer)
+    shape = curve.toShape()
+except:
+    # Fallback or alternative logic
+    pass
+```
+But I need to provide a single working script.
+
+Let's check if there is a `Part.Geom` class.
+`Part.Geom` contains geometry types.
+`Part.Geom.BSplineCurve` is the class.
+
+So, let's replace `Part.BsplineCurve` with `Part.Geom.BSplineCurve`.
+Wait, `Part.Geom.BSplineCurve` takes a different constructor? No, it's similar.
+
+Also, there is a method `Part.BSplineCurve` (uppercase)? No.
+
+Let's try `Part.BSplineCurve`? No.
+
+Okay, I will use `Part.BsplineCurve` but wrapped in a try/except to fall back to `Part.Geom.BSplineCurve` if needed, or just use `Part.Geom.BSplineCurve` directly as it's safer in some versions.
+Actually, let's look at the provided code again.
+The error is `module 'Part' has no attribute 'BsplineCurve'`.
+This implies `Part.BsplineCurve` is missing.
+In FreeCAD 0.19, it is there.
+Maybe the user is using a very stripped-down version or a different Python environment (like an embedded Python in a tool using FreeCAD引擎).
+
+However, `Part` module usually exposes it.
+Let's try `Part.BezierCurve`? It supports `interpolate` as well?
+Actually `Part.BezierCurve` usually uses `approximate`.
+
+Let's use `Part.BsplineCurve` but ensure the syntax is perfect.
+One common mistake is forgetting that `interpolate` takes a list of vectors.
+
+Let's assume the user wants the code to work.
+I will define a helper function or just use the standard one.
+Wait, maybe the user needs to use `FreeCAD` instead of `Part`?
+No, `Part` is standard.
+
+Let's look at the generated code in "Attempt 1".
+It's well structured.
+I will just replace `Part.BsplineCurve` with `Part.Geom.BSplineCurve` and see if that works?
+Actually, `Part.Geom` is a class container.
+Usage: `Part.Geom.BSplineCurve()`.
+
+But wait, in recent FreeCAD, `Part.BsplineCurve` *is* the public API.
+Let's look at a working example of vase generation from the web.
+They often use `Part.BsplineCurve`.
+
+Maybe the issue is the Python version? No.
+
+Let's check if the `interpolate` method works on `Part.BsplineCurve`.
+Yes.
+
+Okay, I will make a strategic change to ensure it runs:
+I'll use `Part.BsplineCurve` but I'll import it differently or define it using `Part.Shape`?
+No, let's stick to the curve.
+I will use `Part.BsplineCurve` but if it fails, I will mention `Part.Geom`.
+
+Actually, wait. There is a simpler way to make a smooth profile in FreeCAD:
+Create a wire from points and use `makeSpline`?
+`Part.Wire(list_of_edges).makeSpline()`? No.
+
+Let's go back to the error.
+If `Part.BsplineCurve` fails, maybe I should try `Part.BezierCurve`.
+`Part.BezierCurve` has `interpolate`? No, `approximate`.
+
+Okay, let's look at `Part.BsplineCurve` one more time.
+Is it possible that `points_outer` is the issue? No.
+
+I will provide the code that uses `Part.BsplineCurve` but I will check the FreeCAD source.
+In `src/Mod/Part/App/PreCompiled.h` or `BezierCurve.cpp`...
+`Part.BsplineCurve` is implemented in C++. It's exposed to Python.
+
+Maybe the user's FreeCAD installation is corrupt or an old alpha?
+But I must generate code for them.
+
+Let's try a trick:
+`import Part`
+`curve = Part.BsplineCurve()`
+If this fails, maybe `Part` refers to something else in their script execution context?
+No, `import Part` is standard.
+
+Let's assume the error message is accurate for their specific environment (which I cannot see).
+I will write the code using `Part.BsplineCurve`, but I will wrap the creation in a way that might catch the error or use an alternative if the standard fails?
+No, that's too complex for a macro generation.
+
+Let's try to use `Part.makePolygon` with `closed=False` and then `makeSpline`?
+`Part.makePolygon` creates edges.
+`Part.Wire(edges)` creates a wire.
+`wire.makeSpline()` -> returns a spline shape.
+This is a very robust way to create a spline through points!
+This avoids the `BsplineCurve` object creation altogether and operates directly on Shapes.
+It uses the underlying OCC functionality.
+
+Let's verify:
+```python
+import Part
+pts = [FreeCAD.Vector(0,0,0), FreeCAD.Vector(10,10,0)]
+edges = [Part.LineSegment(p1, p2).toShape() for p1, p2 in zip(pts[:-1], pts[1:])]
+wire = Part.Wire(edges)
+spline_wire = wire.makeSpline()
+```
+This `makeSpline` method exists on `Part.Wire`.
+This is a safer, "CAD" way to do it without worrying about the specific `BsplineCurve` class constructor availability.
+It creates a B-Spline wire directly.
+
+So, I will rewrite the code to:
+1. Create line segments between the points.
+2. Create a Wire from those segments.
+3. Use `wire.makeSpline()` to smooth it into a curve.
+4. Then convert to shape/wire for the loft/revolve.
+
+This approach is often more compatible and easier to debug.
+
+**Plan:**
+1. Define points.
+2. For Outer Profile:
+   - Create LineSegments between points to form a preliminary wire.
+   - Use `wire.makeSpline()` to get a smooth spline wire.
+   - Note: `makeSpline` might require the wire to be open.
+3. For Inner Profile: Same logic.
+4. Create Faces and Revolve.
+
+Wait, `makeSpline` usually interpolates the vertices of the wire.
+This is perfect.
+
+Let's verify `Part.Wire` has `makeSpline`.
+Yes, in FreeCAD Python `Part.Wire(list_of_edges).makeSpline()`.
+
+Let's double check the vector format. `(radius, height, 0)` is fine.
+The revolve axis is Z `(0,0,1)`.
+
+Let's refine the code.
+
+Code structure:
+```python
+import FreeCAD
+import Part
+import math
+
+# ... doc setup ...
+
+# Helper to create spline wire from points
+def create_spline_wire(points):
+    # Create edges between points
+    edges = []
+    for i in range(len(points) - 1):
+        edges.append(Part.LineSegment(points[i], points[i+1]).toShape())
+    
+    # Create a wire from edges
+    wire = Part.Wire(edges)
+    
+    # Convert to spline (smooth)
+    # Note: makeSpline returns a shape, we might need to wrap it back to a wire
+    # Actually, wire.makeSpline() returns a Shape (usually a wire).
+    # We need to ensure it's a closed wire if we want a face, but here we are making a profile.
+    # A vase is a surface of revolution, so the profile should be a single open wire.
+    # However, for a solid, we usually make a face. 
+    # Face requires a closed wire.
+    # The spline is open at the ends (bottom to top).
+    # So we get a wire.
+    
+    # Wait, if I use makeSpline, does it interpolate or approximate?
+    # It approximates (spline) through the vertices.
+    # It should be fine.
+    
+    # However, if we want a "Face" to revolve, we need a closed boundary.
+    # The profile consists of the outer curve and inner curve.
+    # Usually we combine them into one wire? 
+    # Or we create a face with holes (which the user tried).
+    
+    # If we create a face with holes, we need the outer wire (closed? no, it's a line).
+    # A Face is defined by a closed wire.
+    # Here the user provided points like (20,0) -> (30,5) ... (30,120).
+    # This is an open profile (from bottom to top).
+    # To make a face to revolve, we need to close it?
+    # Wait, if we revolve an open curve, it makes a surface (like a pipe).
+    # If we want a solid vase, we usually revolve a "Filled" shape (Face).
+    # To have a face, the profile must be closed (loop).
+    # But the points provided are: bottom -> top.
+    # So it's an open curve.
+    # To make a solid, we usually revolve a surface.
+    # Part.revolve() works on faces and shells.
+    # If we pass a wire, it makes a surface.
+    # If we pass a face, it makes a solid (closed volume).
+    
+    # The user code tries to make a Face.
+    # `face = Part.Face([wire_outer, wire_inner])`.
+    # For this to work, the wires must be closed.
+    # But the points are open.
+    # So maybe we need to connect the ends to close the loop?
+    # Or maybe the user wants to revolve the surface directly?
+    # `vase = face.revolve(...)`
+    
+    # Let's look at the user's points:
+    # (20,0) is bottom center? Radius 20.
+    # (30,5) is bottom edge? Radius 30.
+    # ...
+    # (30, 120) is top edge.
+    # This is an open profile.
+    # If we want a solid with thickness, we need a closed profile (like a donut slice).
+    # The user provides Inner and Outer points.
+    # This suggests they want to create a face that has a hole? Or a thick wall?
+    # If they want a thick wall, the profile should be closed.
+    # But they gave points "along the height".
+    # Like a path.
+    
+    # Maybe
+</think>

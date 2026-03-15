@@ -1,0 +1,70 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 2**:
+
+**The following macro failed**:
+```
+import FreeCAD
+    import Part
+    import math
+
+    # 1. Create Document
+    doc = FreeCAD.newDocument("Vase")
+    App.setActiveDocument("Vase")
+
+    # 2. Define Profile Points (Radius, Height)
+    # X is radius, Y is height, Z is 0
+    p1 = FreeCAD.Vector(0, 0, 0)
+    p2 = FreeCAD.Vector(2, 0, 0)
+    p3 = FreeCAD.Vector(7, 10, 0) # Widest point
+    p4 = FreeCAD.Vector(3, 20, 0) # Neck
+    p5 = FreeCAD.Vector(4.5, 28, 0) # Rim flare
+    p6 = FreeCAD.Vector(0, 28, 0) # Close shape at top (Center axis)
+
+    # 3. Create the profile curve (Spline)
+    curve = Part.BSplineCurve()
+    curve.interpolate([p1, p2, p3, p4, p5])
+
+    # 4. Create closing lines
+    line_top = Part.makeLine(p5, p6)
+    line_axis = Part.makeLine(p6, p1)
+
+    # 5. Create a Wire (Profile)
+    # The curve is an edge, lines are edges.
+    profile_wire = Part.Wire([curve.toShape(), line_top, line_axis])
+
+    # 6. Create a Face (needed for revolution)
+    profile_face = Part.Face(profile_wire)
+
+    # 7. Revolve (Lathe)
+    # Axis: Y-axis (passing through p1)
+    vase_shape = profile_face.revolve(p1, FreeCAD.Vector(0,1,0), 360)
+
+    # 8. Create Object
+    obj = doc.addObject("Part::Feature", "Vase")
+    obj.Shape = vase_shape
+
+    # 9. Recompute
+    doc.recompute()
+
+    # 10. Set View
+    App.ActiveDocument = App.getDocument("Vase")
+    Gui.ActiveDocument = Gui.getDocument("Vase")
+    Gui.SendMsgToActiveView("ViewFit")
+
+    # Set isometric view
+    view = Gui.ActiveDocument.ActiveView
+    view.viewIsometric()
+```
+
+**Error Message**:
+unexpected indent (<unknown>, line 2)
+
+**User's instruction was**:
+创建一个花瓶
+
+**Selection Info**:
+No selection

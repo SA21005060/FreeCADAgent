@@ -1,0 +1,248 @@
+<think>
+The user wants me to fix a FreeCAD Python macro that previously failed.
+The error was `name 'App' is not defined`.
+The goal is to create a water bottle model based on the code provided in "Attempt 1".
+
+**Analysis of the code:**
+1.  The code imports `FreeCAD`, `Part`, `Sketcher`, `PartDesign`.
+2.  It tries to use `App` directly without defining it. In FreeCAD Python macros run inside the FreeCAD console, `FreeCAD` is usually imported, but `App` (which is usually `FreeCAD.Application`) isn't always automatically aliased unless specified or run in a specific console context.
+3.  However, standard practice in FreeCAD macros usually involves importing `FreeCAD` and `FreeCADGui`, and accessing `App` as `FreeCAD.App` or defining `App = FreeCAD.App`.
+4.  Looking at the previous code: `App.setActiveDocument("WaterBottle")`, `App.ActiveDocument`, etc. are used.
+    *   The fix is simple: `App = FreeCAD.App` or use `FreeCAD.App`.
+    *   Or, simply add `import FreeCAD` and use `FreeCAD.` prefix everywhere, OR `from FreeCAD import App, Gui` (though `Gui` is needed too).
+    *   Actually, the most common way to write these macros for maximum compatibility is to use the `FreeCAD` module object.
+    *   Let's check standard FreeCAD macro headers. Usually: `import FreeCAD`, then `import Part`, etc. Then `App = FreeCAD.App`.
+    *   Wait, `App` is a submodule. `FreeCAD.App` is the application object.
+    *   The easiest fix is to add `App = FreeCAD.App` at the top or import `App` from `FreeCAD`.
+
+**Specific Logic Issues:**
+1.  **Profile Creation**:
+    *   `body = App.ActiveDocument.addObject('PartDesign::Body', 'BottleBody')` is correct.
+    *   `sketch.Support = (App.ActiveDocument.XY_Plane, [''])`. This might be tricky. The standard way to attach a sketch to a plane in a Body is often using `Sketch.AttachmentOffset` or `Sketch.Support`. But in a `PartDesign::Body`, it's usually automatically mapped to the origin.
+    *   However, the constraint creation part: `sketch.addConstraint(Sketcher.Constraint('Coincident', 0, 2, -1, 1))`. This syntax is outdated or specific. Sketcher constraints usually take indices of geometry or coincident with point.
+    *   **Constraint Syntax**: In modern FreeCAD (0.19+), `addConstraint` uses `Sketcher.Constraint(type, [args])`.
+        *   `Coincident(int geoId1, int pointId1, int geoId2, int pointId2)`
+        *   Indices for `geoList` start at 0.
+        *   `geoList` has 6 lines. Indices 0 to 5.
+        *   The code tries: `Coincident(0, 2, -1, 1)`.
+        *   `0` is the first LineSegment. `2` usually means start point? No, let's look at docs.
+        *   Point IDs: 1=Start, 2=End.
+        *   `-1` is the coordinate system origin (0,0).
+        *   The code tries to constrain point 2 (End) of Line 0 to Origin. This seems correct if `0` is the first line.
+        *   `Vertical(-1, 1, -1, 2)` tries to constrain something to be vertical. Usually, you constrain two points. `Vertical` constraint usually takes two points (or a line). Using `-1` (origin) might not be the right way to constrain a line to be vertical against the axis unless using `Coincident` to lock it first.
+        *   Actually, a better approach for a revolve profile is to just draw the lines. If the lines share endpoints, they are connected. The axis is usually defined by a construction line or by the fact that it's a revolve.
+        *   However, for a revolve to work properly around an axis, the axis of rotation is typically the Z axis (standard for revolve) or the user specifies an axis. The code specifies `revolution.Axis = (0, 1, 0)` (Y-axis).
+        *   If the profile is on the XY plane, and we revolve around Y, the profile must include the axis (Y-axis). The Y-axis is the line x=0.
+        *   The profile drawn:
+            *   (0,0) -> (r, 0) (Bottom radius)
+            *   (r, 0) -> (r, h) (Side)
+            *   (r, h) -> (rn, h+hn) (Shoulder)
+            *   (rn, h+hn) -> (rn, h+hn) (Neck vertical - redundant line?)
+            *   (rn, h+hn) -> (0, h+hn) (Top width back to axis)
+            *   (0, h+hn) -> (0,0) (Axis back to origin)
+        *   This creates a closed loop touching x=0. This works for revolve.
+
+2.  **Constraint Logic**:
+    *   The code tries to add constraints:
+        *   `Coincident`: Locks the start of the first line to (0,0). Good.
+        *   `Vertical`/`Horizontal`: This syntax is wrong. `Vertical` takes two points. `Vertical(-1, 1, -1, 2)` implies constraining point 1 of origin to point 2 of origin. This doesn't make sense.
+        *   Actually, to fix the "name 'App' is not defined" is the primary task. But if the code crashes later on constraints, it's still a failure.
+        *   However, usually, if you just draw the lines that form the closed shape described (0,0) -> (r,0)...(0,h+hn) -> (0,0), the sketch is fully constrained geometrically by geometry itself if the points are coincident. But `Coincident` constraints between segments are needed if they are separate lines.
+        *   Wait, `addGeometry` adds lines. They don't automatically merge vertices.
+        *   We need `Coincident` constraints between the endpoints of consecutive lines.
+        *   Also, if we revolve around Y, we need to ensure the line at x=0 acts as the axis. The code draws a line from (0, h+hn) to (0,0). This is the axis.
+        *   The constraints in the original code are likely to cause errors or do nothing useful.
+        *   I should simplify or fix the constraints to ensure the shape is watertight for the revolution.
+        *   Better approach: Add `Coincident` constraints between line endpoints.
+        *   Also, the `Vertical` and `Horizontal` constraints in the original code look like placeholders or confused syntax. I will replace them with proper `Coincident` constraints to ensure the path is continuous.
+
+3.  **Revolve**:
+    *   `revolution.Profile = sketch` -> This is the old API (0.17).
+    *   New API: `revolution.Profile = [(sketch, 'Face1')]`? Or just `revolution.Profile = sketch`.
+    *   Wait, in `PartDesign::Revolution`, the profile must be a single wire. If the sketch has multiple lines, it might not be recognized as a single profile automatically unless they are constrained together.
+    *   Let's assume standard behavior: The sketch object contains the profile.
+
+4.  **Cap and Fusion**:
+    *   `Part::Cylinder` is a solid.
+    *   `Part::MultiFuse` is for joining shapes. This works.
+    *   However, the code tries to fuse a `PartDesign::Body` and a `Part::Cylinder`.
+    *   `PartDesign::Body` contains the revolution. The `body` variable is the *Body* object, not the shape.
+    *   `cap` is a `Part::Cylinder`.
+    *   Fusing a Body object and a Cylinder object might work in newer FreeCAD versions (it tries to get the Shape), but it's safer to use `Part::Fuse` or fuse the underlying shapes.
+    *   Better yet: Add the Cylinder *inside* the Body as an additive feature (Pad) or just create a separate shape and fuse.
+    *   The prompt asks to fix the provided macro. The main issue is the `App` definition. I will stick to the logic provided but clean up the errors.
+    *   Actually, the most robust way is:
+        *   Define `App = FreeCAD.App`.
+        *   Fix the constraints to actually connect the lines, otherwise the revolution might fail or create weird results.
+
+**Constraint Fix**:
+The user wants to rotate around Y (0,1,0).
+Profile:
+0: (0,0) -> (r,0)
+1: (r,0) -> (r,h)
+2: (r,h) -> (rn, h+hn)
+3: (rn, h+hn) -> (0, h+hn) (Wait, the original code had a weird 4th line "neck vertical" then line to 0).
+Let's simplify the geometry list to just the necessary segments:
+1. Bottom: (0,0) -> (r,0)
+2. Side: (r,0) -> (r, h)
+3. Shoulder: (r, h) -> (rn, h+hn)
+4. Top: (rn, h+hn) -> (0, h+hn)
+5. Axis: (0, h+hn) -> (0,0)
+That's 5 lines.
+
+Constraints:
+- Connect Line 0 End to Line 1 Start.
+- Connect Line 1 End to Line 2 Start.
+- Connect Line 2 End to Line 3 Start.
+- Connect Line 3 End to Line 4 Start.
+- Connect Line 4 End to Line 0 Start (Origin).
+- This ensures a closed wire.
+
+However, the user code provided had specific constraints. I shouldn't over-engineer if the main request is to fix the error and make it run. The "App" error stops it immediately.
+
+**Code Fix Steps:**
+1.  Add `App = FreeCAD.App` (or use `FreeCAD.App`).
+2.  Use `Gui = FreeCAD.Gui` (implicitly used in `Gui.ActiveDocument`).
+3.  Check the constraint logic. The original constraints `Vertical`/`Horizontal` are syntactically invalid for multiple reasons (likely Index out of bounds or wrong argument count).
+    *   I will replace them with `Coincident` constraints to chain the segments together. This ensures the profile is valid for revolution.
+4.  Revolve axis: The user code says `Axis = (0, 1, 0)`. This is the Y-axis. The sketch is on the XY plane (default for Sketches in PartDesign usually). Revolving around Y in XY plane works fine.
+5.  Cap placement: `Placement` uses `Vector`. The vector is `0, 0, ...`. Wait.
+    *   FreeCAD default coordinate system: Z is up.
+    *   User defines `body_height`.
+    *   The profile is drawn on XY plane. Z is 0.
+    *   The revolve creates a shape.
+    *   If revolve is around Y, the axis is the Y-axis (vertical line on the screen, or depth?). Wait.
+    *   Standard FreeCAD: X right, Y up, Z towards user.
+    *   If Sketch is on XY plane (Z=0), and we revolve around Y.
+    *   The profile extends in X and Y.
+    *   The result extends in X and Z.
+    *   The "height" of the bottle will be along the Y axis of the sketch.
+    *   So the top of the bottle is at `y = body_height + neck_height`.
+    *   The cap needs to be placed at `y = body_height + neck_height`.
+    *   The code calculates: `Vector(0, 0, body_height + neck_height + cap_height/2)`.
+    *   This puts it on the Z axis. This is wrong if the bottle is along Y.
+    *   If the bottle is created by revolving around Y, the "height" is Y.
+    *   The cap should be at `Vector(0, body_height + neck_height + cap_height/2, 0)`.
+    *   Wait, check the code: `revolution.Axis = (0, 1, 0)`. This is Y.
+    *   The sketch coordinates: (x, y). X is radius. Y is height.
+    *   So yes, the bottle is vertical along Y.
+    *   So the Cap should be at `Vector(0, body_height + neck_height + cap_height/2, 0)`.
+
+**Refining the Code:**
+- Import `FreeCAD`.
+- Define `App`.
+- Define `Gui`.
+- Fix Geometry indices.
+- Fix Constraints (simplified to ensure closure).
+- Fix Cap placement.
+- Use `PartDesign::Revolution` correctly.
+
+Let's write the corrected macro.
+
+```python
+import FreeCAD
+import Part
+import Sketcher
+import PartDesign
+
+# --- 1. 初始化设置 ---
+# 定义 App 和 Gui 以修复 'App' is not defined 错误
+App = FreeCAD.App
+Gui = FreeCAD.Gui
+
+# 创建一个新文档
+doc = App.newDocument("WaterBottle")
+App.setActiveDocument("WaterBottle")
+# Gui.ActiveDocument = Gui.getDocument("WaterBottle") # Usually handled by setting active doc, but explicit is fine if needed. 
+# However, standard macro usually just calls functions.
+
+# 定义参数
+body_radius = 25.0
+body_height = 80.0
+neck_radius = 12.0
+neck_height = 20.0
+cap_radius = 14.0
+cap_height = 15.0
+
+# --- 2. 创建瓶身 (使用旋转功能) ---
+# 创建实体基体
+body = App.ActiveDocument.addObject('PartDesign::Body', 'BottleBody')
+
+# 创建草图 (在XY平面绘制半剖面)
+sketch = App.ActiveDocument.addObject('Sketcher::SketchObject', 'BottleProfile')
+# 这里的 Support 设置可能不需要，但为了保险设为 XY Plane
+sketch.Support = (App.ActiveDocument.XY_Plane, [''])
+sketch.MapMode = 'FlatFace'
+body.addObject(sketch)
+
+# 绘制线条 (半剖面轮廓) - 简化逻辑
+# 1. 底部: (0,0) -> (r, 0)
+# 2. 瓶身: (r, 0) -> (r, h)
+# 3. 瓶肩: (r, h) -> (rn, h+hn)
+# 4. 瓶口: (rn, h+hn) -> (0, h+hn)
+# 5. 轴心: (0, h+hn) -> (0, 0)
+
+geoList = []
+geoList.append(Part.LineSegment(FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(body_radius, 0, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(body_radius, 0, 0), FreeCAD.Vector(body_radius, body_height, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(body_radius, body_height, 0), FreeCAD.Vector(neck_radius, body_height + neck_height, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(neck_radius, body_height + neck_height, 0), FreeCAD.Vector(0, body_height + neck_height, 0)))
+geoList.append(Part.LineSegment(FreeCAD.Vector(0, body_height + neck_height, 0), FreeCAD.Vector(0, 0, 0)))
+
+sketch.addGeometry(geoList, False)
+
+# 添加约束以闭合图形并固定形状
+# 约束线段端点重合
+# Coincident(GeoId1, PointId1, GeoId2, PointId2) -> PointId: 1=Start, 2=End
+# Line 0 End to Line 1 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 0, 2, 1, 1))
+# Line 1 End to Line 2 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 1, 2, 2, 1))
+# Line 2 End to Line 3 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 2, 2, 3, 1))
+# Line 3 End to Line 4 Start
+sketch.addConstraint(Sketcher.Constraint('Coincident', 3, 2, 4, 1))
+# Line 4 End to Line 0 Start (Origin)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 4, 2, 0, 1))
+
+# 固定底部在原点 (可选，但推荐)
+sketch.addConstraint(Sketcher.Constraint('Coincident', 0, 1, -1, 1)) 
+
+# 执行旋转 (Revolve)
+revolution = App.ActiveDocument.addObject('PartDesign::Revolution', 'Revolution')
+revolution.Profile = sketch
+revolution.Axis = (0, 1, 0) # 绕Y轴旋转
+revolution.Angle = 360.0
+body.addObject(revolution)
+
+# --- 3. 创建瓶盖 (使用圆柱体) ---
+# 添加一个新的圆柱体作为瓶盖
+cap = App.ActiveDocument.addObject('Part::Cylinder', 'BottleCap')
+cap.Radius = cap_radius
+cap.Height = cap_height
+
+# 修正位置：瓶盖中心应该位于 (0, body_height + neck_height + cap_height/2, 0)
+# 这里的坐标系中，Y是高度方向
+cap.Placement = FreeCAD.Placement(FreeCAD.Vector(0, body_height + neck_height + cap_height/2, 0), FreeCAD.Rotation(0, 0, 0))
+
+# --- 4. 合并瓶身和瓶盖 ---
+# 注意：直接Fuse Body对象和Part对象在某些版本可能有问题，这里使用 Part::Fuse
+# 先获取 Body 的 Shape
+body_shape = body.Shape
+# 获取 Cap 的 Shape
+cap_shape = cap.Shape
+
+# 创建融合对象
+fusion = App.ActiveDocument.addObject('Part::Fuse', 'BottleFusion')
+fusion.Shape = body_shape.fuse(cap_shape)
+
+# 删除中间的临时对象（可选，为了视图清洁）
+# App.ActiveDocument.removeObject(cap.Name) 
+# App.ActiveDocument.removeObject(revolution.Name) 
+# (如果不删除，它们会以组件形式出现在树中，也可以)
+
+# 刷新视图
+App.ActiveDocument.recompute()
+
+# --- 5. 设置颜色和外观 ---
+view

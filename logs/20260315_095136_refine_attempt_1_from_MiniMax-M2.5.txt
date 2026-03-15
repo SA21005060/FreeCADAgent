@@ -1,0 +1,306 @@
+<think>
+The user wants a FreeCAD Python macro to create a "Water Kettle" (水壶).
+The previous attempt failed due to an indentation error.
+The user provided a partial script that has syntax issues (indentation on imports, incorrect placement logic, and incomplete handle definition).
+
+**Plan:**
+1.  **Fix Syntax**: Ensure proper indentation (no spaces before imports) and correct Python syntax.
+2.  **Design the Kettle**:
+    *   **Body**: A cylinder or a combination of a cylinder and a sphere (bottom) to make it look like a kettle. Let's stick to a Cylinder for simplicity, maybe slightly tapered or just a simple cylinder as requested in the prompt "Main Body (Cylinder)". I will use a simple Cylinder as the base.
+    *   **Spout**: A cylinder positioned on the side, angled up. It needs to be moved away from the center and rotated.
+    *   **Handle**: The previous code tried to use a Torus but realized it needs slicing or positioning. A simple way to make a handle in FreeCAD using Part workbench is a U-shaped tube or two cylinders and a torus segment. However, creating a solid handle from primitives is tricky without boolean operations.
+    *   *Refined Handle*: Let's create a "U" shape using a `Part::Torus` (almost full circle) or just a `Part::Torus` cut in half, but simpler is to use `Part::Cylinder` arranged in an arch, or just a Torus positioned to stick out the side.
+    *   Let's try a simple Torus for the handle, rotated so the hole aligns with the body.
+3.  **Recompute**: Ensure `App.ActiveDocument.recompute()` is called.
+4.  **View**: Set the camera to Isometric view and zoom to fit.
+
+**Detailed Steps for the Script:**
+
+1.  **Imports**: `FreeCAD`, `Part`, `math`.
+2.  **Document**: Create "Kettle".
+3.  **Body**: Cylinder at (0,0,0), Radius 40, Height 100.
+4.  **Spout**:
+    *   Radius 8, Height 40.
+    *   It needs to stick out from the side.
+    *   Position: Vector(40, 0, 50) (Middle of height).
+    *   Rotation: Needs to tilt up. Axis (1,0,0) (X-axis) by -45 degrees.
+    *   Note: The `Placement` property takes a `Vector` (position) and a `Rotation`. The previous code used `App.Placement(Vector, Rotation)`.
+5.  **Handle**:
+    *   Let's use a Torus.
+    *   Radius1 (Major) = 35.
+    *   Radius2 (Minor) = 5.
+    *   It should be positioned on the opposite side of the spout (e.g., x = -40).
+    *   Rotation: It needs to stand up. Default torus lies in XY plane. We need to rotate it 90 degrees around Y to make it stand up like a handle, then rotate around X to align with the body.
+    *   Actually, a simpler handle is a cylinder bent into a U-shape, but that's complex.
+    *   Let's try a Torus with a very large inner radius? No, Torus parameters are major/minor.
+    *   Let's try 3 cylinders for the handle: Left vertical, Bottom arc, Right vertical.
+    *   *Alternative*: Just a simple Torus rotated 90 deg around X (lying flat) then placed on the side.
+    *   Let's go with a Torus placed at (-40, 0, 50). Rotated around X by 90 degrees so the hole faces the cylinder.
+6.  **Colors/Materials**: Not strictly requested, but nice to have.
+7.  **View**: `Gui.ActiveDocument.activeView().viewIsometric()` and `fitAll()`.
+
+**Refining the Geometry:**
+
+*   **Body**: Cylinder (Radius 40, Height 100). Center (0,0,0). This means it goes from z=-50 to z=50.
+*   **Spout**:
+    *   Center of spout should be around z=30 (upper half).
+    *   Offset x=40.
+    *   To angle it: Rotate -45 deg around X axis.
+    *   Placement: `App.Vector(40, 0, 30)`, `App.Rotation(App.Vector(1, 0, 0), -45)`.
+*   **Handle**:
+    *   Let's make it look like a classic kettle handle.
+    *   A Torus is okay, but positioning it is tricky.
+    *   Let's use a Torus with Radius1=30 (Major), Radius2=5 (Minor).
+    *   Position: x = -40.
+    *   Rotation: Rotate 90 deg around Y axis (to make the ring stand up?), then maybe a bit around Z to align.
+    *   Actually, the default Torus is in XY plane. If I rotate it 90 deg around Y, it becomes vertical in ZY plane.
+    *   Let's try placing it at `App.Vector(-45, 0, 50)` (top edge of body).
+    *   Rotate around X by 90 degrees? No.
+    *   Let's just put a simple Torus, and the user can adjust rotation if it's not perfect, or I can use trial and error logic in my head.
+    *   Rotation 1: 90 deg around Y (so the ring stands up). Rotation 2: Align with body.
+    *   Actually, let's try to merge them into a single shape? The prompt doesn't explicitly ask for a boolean fusion, just "create a kettle". Keeping them as separate objects in the tree is safer and easier to code.
+
+**Fixing the Error**:
+The previous code had indentation errors (`import FreeCAD` was indented) and logic issues.
+I will write a clean script.
+
+**Code Structure**:
+```python
+import FreeCAD
+import Part
+import math
+
+# Create doc
+App.newDocument("Kettle")
+App.setActiveDocument("Kettle")
+App.ActiveDocument = App.getDocument("Kettle")
+Gui.ActiveDocument = App.getDocument("Kettle")
+
+# 1. Body
+body = App.ActiveDocument.addObject("Part::Cylinder", "Body")
+body.Radius = 40
+body.Height = 100
+body.Placement = App.Placement(App.Vector(0, 0, -50), App.Rotation(0, 0, 0, 1)) # Shift so base is at 0? Or center at 0. 
+# Let's keep center at 0,0,0. Z ranges -50 to 50.
+
+# 2. Spout
+# A cylinder on the side.
+spout = App.ActiveDocument.addObject("Part::Cylinder", "Spout")
+spout.Radius = 8
+spout.Height = 40
+# Move to side
+# Base of spout should start around x=40, z=20.
+# Let's position the center of the cylinder.
+# x=40, y=0, z=30.
+# Rotation around X: -45 degrees (points up).
+spout.Placement = App.Placement(App.Vector(40, 0, 30), App.Rotation(App.Vector(1, 0, 0), -45))
+
+# 3. Handle
+# Let's use a Torus
+handle = App.ActiveDocument.addObject("Part::Torus", "Handle")
+handle.Radius1 = 30 # Major
+handle.Radius2 = 6  # Minor
+# Position on the left side: x = -40.
+# We need it to look like a handle.
+# Default Torus is in XY plane centered at 0.
+# Rotate 90 deg around Y to make it vertical in ZY plane.
+# Then rotate 90 deg around Z? 
+# Let's try placement: x=-40, y=0, z=30.
+# Rotation: Axis (0,1,0), Angle 90. Then Axis (1,0,0), Angle 90?
+# Let's keep it simple.
+handle.Placement = App.Placement(App.Vector(-40, 0, 30), App.Rotation(App.Vector(0, 1, 0), 90))
+
+# 4. Recompute
+App.ActiveDocument.recompute()
+
+# 5. View
+Gui.ActiveDocument.activeView().viewIsometric()
+Gui.ActiveDocument.activeView().fitAll()
+```
+
+Wait, the handle rotation is tricky to guess. A Torus in XY plane has a hole along Z. Rotating 90 around Y makes the hole along X. If I place it at x=-40, the hole is along X (through the kettle).
+I want the handle to loop *around* the kettle.
+Actually, a simple way to make a handle is to create a Tube (hollow cylinder) bent? No, too complex for a macro.
+Let's try the Torus again.
+If I place a Torus at x=-40.
+Rotate around Y by 90 deg. The torus circle is in XZ plane.
+I need the tube to wrap around the body.
+The body is at 0,0. The handle is at -40. The major radius is 30. -40 + 30 = -10 (near body). -40 - 30 = -70 (far out).
+This seems roughly correct. It might look like a washer on the side.
+Let's adjust `Radius1` to fit nicely.
+
+Let's finalize the code logic.
+
+1.  **Body**: Cylinder r=40, h=100.
+2.  **Spout**: Cylinder r=10, h=50. Pos (40,0,30). Rot (-45, 1,0,0).
+3.  **Handle**: Torus R1=35, R2=5. Pos (-40,0,30). Rot (90, 0,1,0).
+
+This should produce a recognizable kettle shape.
+
+One details: The "unexpected indent" error in the user provided script happened because the imports were indented inside the code block representation, but likely in the actual file they were fine? Or the user pasted it with leading spaces. I will ensure my output has no leading spaces for imports.
+
+Let's add comments in Chinese as implied by the user's prompt language ("创建一个水壶").
+
+Final check on placement:
+Spout radius 10. Body radius 40.
+Spout center x=40. 40 - 10 (radius) = 30 (surface of body). Good.
+Spout Height 50.
+Rotation -45 deg.
+
+Handle:
+Center at x = -40.
+Body is at 0.
+Radius 1 (Major) = 35.
+-40 + 35 = -5 (inside body? 40 is body radius). Yes, it intersects.
+-40 - 35 = -75 (outside).
+So the handle wraps around the body. It might clip into the body, which is fine for a simple model, or we can move it slightly out.
+Let's move handle x to -45.
+
+Code looks solid.
+
+One more thing: `App.newDocument` might fail if a document with that name already exists. I should probably check or just let it fail, usually in macros we assume clean environment or overwrite. `App.closeDocument` could be used but might be too aggressive. I'll stick to standard `newDocument`.
+
+The user instruction includes "set the isometric view to the part".
+
+```python
+import FreeCAD
+import Part
+import math
+
+# 创建新文档
+App.newDocument("Kettle")
+App.setActiveDocument("Kettle")
+App.ActiveDocument = App.getDocument("Kettle")
+Gui.ActiveDocument = App.getDocument("Kettle")
+
+# 1. 创建主体 (圆柱体)
+# 半径 40, 高度 100. 中心在 (0,0,0)
+body = App.ActiveDocument.addObject("Part::Cylinder", "Body")
+body.Radius = 40
+body.Height = 100
+
+# 2. 创建壶嘴 (圆柱体)
+# 半径 10, 高度 40. 放置在侧面并倾斜
+spout = App.ActiveDocument.addObject("Part::Cylinder", "Spout")
+spout.Radius = 10
+spout.Height = 40
+# 位置: x=40 (身体右侧), z=30 (偏上). 旋转: 绕X轴 -45度
+spout.Placement = App.Placement(App.Vector(40, 0, 30), App.Rotation(App.Vector(1, 0, 0), -45))
+
+# 3. 创建把手 (圆环体)
+# 大半径 35, 小半径 5. 放置在左侧
+handle = App.ActiveDocument.addObject("Part::Torus", "Handle")
+handle.Radius1 = 35  # 大半径 (Major)
+handle.Radius2 = 6   # 小半径 (Minor)
+# 位置: x=-45 (身体左侧), z=30 (与壶嘴对齐)
+# 旋转: 绕Y轴旋转90度，使其立起来
+handle.Placement = App.Placement(App.Vector(-45, 0, 30), App.Rotation(App.Vector(0, 1, 0), 90))
+
+# 重新计算
+App.ActiveDocument.recompute()
+
+# 4. 视图设置
+Gui.ActiveDocument.activeView().viewIsometric()
+Gui.ActiveDocument.activeView().fitAll()
+```
+This looks correct. It fixes the indentation and logic issues.
+
+One minor adjustment: The previous code used `App.Placement(Vector, Rotation)`. This is correct.
+The handle rotation: `Rotation(Vector(0,1,0), 90)` rotates 90 deg around Y axis. The default Torus is in XY plane. Rotating 90 around Y moves the Z-axis circle to lie on the X-axis? No.
+Let's visualize:
+Default: Circle in XY plane centered at origin. Axis of symmetry is Z.
+Rotate 90 around Y: Circle moves to XZ plane. Axis of symmetry is Y.
+This puts the "hole" along Y.
+We want the handle to wrap around the X-axis (the body).
+The body is along Z axis.
+So we want the Torus ring to wrap around the Z axis (like a halo).
+Wait, Body is along Z (vertical). We want the handle to stick out in X (horizontal).
+We want the Torus ring to be in a plane perpendicular to the view, or to wrap around the body.
+If the Torus is in XY plane, its center is 0. Its tube surrounds Z.
+If we move it to x=-45. The tube surrounds x=-45 line.
+This works perfectly for a handle sticking out the side.
+So `Rotation(0,0,1, 90)` is likely better? No, `Rotation` arguments are usually axis vector and angle.
+Actually, the default Torus has a hole along Z.
+We want the hole to be along Y? No.
+We want the handle to be a "C" shape attached to the cylinder.
+If I just place a Torus at x=-45, and I don't rotate it, it looks like a washer on the side of the cylinder.
+This is actually a perfect handle for a kettle if the radius is right.
+- Body Radius: 40.
+- Handle Major Radius: 35.
+- Torus Position x: -40.
+- Intersection: -40 + 35 = -5 (Inside body). -40 - 35 = -75 (Outside).
+Yes, it wraps the body.
+So NO ROTATION is needed for the Torus? Or maybe a small one to align orientation, but visually it works.
+Wait, if Torus is in XY plane, it looks like a donut standing on the floor (hole is vertical Z).
+So the hole is vertical. The cylinder is vertical. The donut sits on the side.
+It looks like a cup handle. This is good.
+However, the previous code had rotation. I'll stick to the basic placement or a simple rotation if needed, but usually, if the logic "wraps around the body" works geometrically, it's fine.
+Actually, let's apply a 90 degree rotation around Z or X to make it look more "attached"?
+Let's just stick to the code that places it. I'll add a small rotation around Y to make it stick "out" a bit more or align. Actually, default is fine.
+Wait, if Torus is in XY plane (Z is up). The torus is flat on the floor. The hole is vertical.
+We want the handle to be a U-shape sticking out horizontally.
+So we want the torus to be vertical. So rotate 90 around X or Y.
+Let's use `App.Rotation(App.Vector(0, 1, 0), 90)` as planned. This makes the torus stand up vertically (hole is horizontal along X).
+Then move it to x = -40.
+This aligns with the body.
+
+Okay, I'm ready to generate the response.
+
+One detail: The user provided code had:
+`import FreeCAD`
+`    import Part` (Indented)
+This suggests the user's environment or copy-paste had issues. I will ensure imports start at column 0.
+
+I will also use `App` and `Gui` aliases or fully qualify them? The previous code used `App` and `Gui` directly after importing, which is standard in FreeCAD macros.
+
+I will add comments in Chinese.
+
+Check Spout placement again:
+Center of body is 0. Surface is 40.
+Spout center x=40.
+It touches the surface.
+Rotation -45.
+It points up and right.
+Looks correct.
+
+Check Handle:
+x = -45.
+Major Radius = 35.
+Left edge: -45 - 35 = -80.
+Right edge: -45 + 35 = -10.
+Body is at 0, radius 40.
+-10 is inside the body (radius 40). -80 is outside.
+So it wraps around the body.
+However, since it's a torus, it will look like a donut on the side.
+To make it look like a handle (a C-shape), usually one needs to cut the torus. But for a simple "create a kettle" macro, this is acceptable.
+
+Let's write the final code.
+
+```python
+import FreeCAD
+import Part
+import math
+
+# 1. 创建文档
+App.newDocument("Kettle")
+App.setActiveDocument("Kettle")
+App.ActiveDocument = App.getDocument("Kettle")
+Gui.ActiveDocument = App.getDocument("Kettle")
+
+# 2. 创建主体 (圆柱体)
+# 半径 40, 高度 100. 中心在 (0,0,0)
+body = App.ActiveDocument.addObject("Part::Cylinder", "Body")
+body.Radius = 40
+body.Height = 100
+# 确保位置正确 (虽然默认就是0,0,0)
+body.Placement = App.Placement()
+
+# 3. 创建壶嘴 (圆柱体)
+# 半径 10, 高度 40.
+spout = App.ActiveDocument.addObject("Part::Cylinder", "Spout")
+spout.Radius = 10
+spout.Height = 40
+# 位置: 偏移到右侧 (x=40), 抬高 (z=30).
+# 旋转: 绕 X 轴 -45 度，使其向上倾斜
+spout.Placement = App.Placement(App.Vector(40, 0, 30), App.Rotation(App.Vector(1, 0,
+</think>

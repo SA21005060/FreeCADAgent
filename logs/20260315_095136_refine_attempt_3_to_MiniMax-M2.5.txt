@@ -1,0 +1,74 @@
+--- System Message ---
+You are a CAD assistant. Generate a complete FreeCAD Python macro according to the user's instructions and/or the provided image. Ensure the final code includes code to fit the view and set the isometric view to the part.
+You previously generated the following macro, which failed with an error. Please fix it accordingly. Ensure the result is valid Python and executable in FreeCAD.
+
+--- User Message ---
+**Attempt 3**:
+
+**The following macro failed**:
+```
+import FreeCAD
+import Part
+import math
+
+# Aliases to ensure compatibility
+App = FreeCAD
+Gui = FreeCAD.Gui
+
+# Create document
+App.newDocument("Kettle")
+App.setActiveDocument("Kettle")
+App.ActiveDocument = App.getDocument("Kettle")
+Gui.ActiveDocument = App.getDocument("Kettle")
+
+# 1. Body (Cylinder)
+# Center at (0,0,0), height 120, radius 40.
+body = App.ActiveDocument.addObject("Part::Cylinder", "Body")
+body.Radius = 40
+body.Height = 120
+body.Placement = App.Placement(App.Vector(0, 0, 0), App.Rotation(0, 0, 0, 1))
+
+# 2. Lid (Cylinder on top)
+# Top of body is at z = 60.
+lid = App.ActiveDocument.addObject("Part::Cylinder", "Lid")
+lid.Radius = 38
+lid.Height = 10
+# Place on top of body (z=60 is top edge, height is 10, so center is at 60 - 5 = 55)
+lid.Placement = App.Placement(App.Vector(0, 0, 55), App.Rotation(0, 0, 0, 1))
+
+# 3. Spout (Cylinder on the side)
+# Body edge is at x=40.
+spout = App.ActiveDocument.addObject("Part::Cylinder", "Spout")
+spout.Radius = 10
+spout.Height = 40
+# Position the center of the spout cylinder.
+# We want it to emerge from x=40.
+# Let's position it at x=40, y=0, z=20.
+# Rotation: -45 degrees around X axis to point upwards.
+spout.Placement = App.Placement(App.Vector(40, 0, 20), App.Rotation(App.Vector(1, 0, 0), -45))
+
+# 4. Handle (Torus)
+# Position on the left: x = -40.
+handle = App.ActiveDocument.addObject("Part::Torus", "Handle")
+handle.Radius1 = 30  # Major radius
+handle.Radius2 = 6   # Minor radius
+# Rotate 90 degrees around Y to make it a vertical loop on the side.
+# Then position it at x=-40.
+handle.Placement = App.Placement(App.Vector(-40, 0, 30), App.Rotation(App.Vector(0, 1, 0), 90))
+
+# 5. Recompute
+App.ActiveDocument.recompute()
+
+# 6. View
+Gui.ActiveDocument.activeView().viewIsometric()
+Gui.ActiveDocument.activeView().fitAll()
+```
+
+**Error Message**:
+'App.Document' object has no attribute 'activeView'
+
+**User's instruction was**:
+创建一个水壶
+
+**Selection Info**:
+No selection

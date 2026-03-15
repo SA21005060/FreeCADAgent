@@ -1,0 +1,342 @@
+<think>
+The user wants me to fix a Python macro for FreeCAD that failed with the error `name 'App' is not defined`.
+
+**1. Analyze the Error:**
+The error `name 'App' is not defined` indicates that the variables `App` and `Gui` (and potentially others like `Part`) are not imported or referenced correctly at the top of the execution context. In FreeCAD macros, these modules are often available globally, but in newer versions or specific script contexts, they might need explicit import or access via `FreeCAD`. The provided code tries to use `App` and `Gui` immediately without defining them, although it imports `FreeCAD` at the top.
+
+Wait, looking at the provided failed code:
+```python
+import FreeCAD
+import Part
+import math
+import Mesh
+# ...
+App.newDocument("CartoonRobot") # Error here
+```
+
+The code imports `FreeCAD` as a module. In the standard FreeCAD Python console, `App` and `Gui` are usually available as shortcuts. However, when running a script from scratch (like a macro file), these shortcuts might not be injected into the global namespace depending on how it's executed. The safest way is to use `FreeCAD.App` and `FreeCAD.Gui`.
+
+Actually, looking at the standard FreeCAD API:
+- `FreeCAD` is the main module.
+- `FreeCAD.ActiveDocument` is the way to access the active document.
+- `App` is often a alias for `FreeCAD`, but `FreeCAD.App` is not standard. It's usually `FreeCAD` or just `App` if the aliases are loaded.
+- `Gui` is usually `FreeCADGui`.
+
+Let's look at the specific lines:
+`App.newDocument("CartoonRobot")`
+`Gui.activeDocument().activeView().viewDefault()`
+
+The error says `name 'App' is not defined`. This confirms that the aliases `App` and `Gui` are not present in the namespace.
+
+**2. Fixing the issue:**
+I need to replace `App` with `FreeCAD` and `Gui` with `FreeCADGui`.
+
+- `App.newDocument(...)` -> `FreeCAD.newDocument(...)`
+- `Gui.activeDocument()` -> `FreeCADGui.ActiveDocument`
+- `Gui.activeDocument().activeView()` -> `FreeCADGui.ActiveDocument.ActiveView`
+
+Also, checking the body of the code:
+`obj_body = FreeCAD.ActiveDocument.addObject(...)` -> This is correct because `App` wasn't used there in the original failed code (Wait, the original code used `App.setActiveDocument`).
+Let's check the original code again.
+`App.newDocument("CartoonRobot")` -> `FreeCAD.newDocument("CartoonRobot")`
+`App.setActiveDocument("CartoonRobot")` -> `FreeCAD.setActiveDocument("CartoonRobot")`
+`Gui.activeDocument()...` -> `FreeCADGui.ActiveDocument...`
+
+Also, I need to make sure `FreeCADGui` is imported.
+`import FreeCAD` is there. `import FreeCADGui` is missing.
+
+**3. Building the corrected code:**
+
+Imports:
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+# Mesh is imported but not used in the shapes provided, I can leave it or remove it. Let's leave it to be safe.
+import Mesh
+```
+
+Initialization:
+```python
+# Create new document
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+# Need to get the Gui object to set view
+FreeCADGui.ActiveDocument.activeView().viewDefault()
+```
+
+The rest of the logic (creating shapes, placing them) seems mostly okay, but `Placement.Base` usage needs to be checked.
+In FreeCAD Python API:
+`object.Placement.Base` is a `Vector`.
+`object.Placement.Rotation` is a `Rotation`.
+
+In the failed code:
+`obj_head.Placement.Base = FreeCAD.Vector(...)` is used.
+However, `Placement` is a property that returns a `Placement` object (by value or reference?). In older FreeCAD versions, modifying `Placement.Base` directly worked if it was mutable. In newer ones, it's safer to assign a new `Placement` object.
+Wait, `FreeCAD.Placement(Vector, Rotation)` is the constructor.
+The failed code does:
+`obj_head.Placement.Base = FreeCAD.Vector(...)`
+This often works in FreeCAD macros because the `Placement` object returned by the property might be a reference to the internal one, allowing modification. However, standard practice is:
+`obj_head.Placement = FreeCAD.Placement(FreeCAD.Vector(...), FreeCAD.Rotation())`
+But the original code tried to set `.Base` directly. This might cause an error "Property 'Placement' is read-only" in some contexts, but the error reported is `name 'App' is not defined`. So fixing the App/Gui import is the primary task.
+
+Also, the user instruction mentions "Selection Info: Object: MyBox". This looks like a generic debug message or context from the previous interaction, but the current task is "Create a cartoon person" (based on the Chinese prompt "创建一个卡通人物"). The previous code attempted to build a robot/cartoon character. The "MyBox" suggests a default selection, but the code creates specific geometry. I should stick to the code's intent (Cartoon Robot/Character).
+
+Let's refine the `App`/`Gui` fix.
+
+Original:
+```python
+App.newDocument("CartoonRobot")
+App.setActiveDocument("CartoonRobot")
+Gui.activeDocument().activeView().viewDefault()
+```
+
+Corrected:
+```python
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+FreeCADGui.ActiveDocument.ActiveView.viewDefault()
+```
+Note: `activeView()` is a method in C++, but in Python `FreeCADGui` access often uses `ActiveDocument.ActiveView`.
+
+Let's check the end of the script:
+```python
+Gui.activeDocument().activeView().fitAll()
+Gui.activeDocument().activeView().viewIsometric()
+```
+Should be:
+```python
+FreeCADGui.ActiveDocument.ActiveView.fitAll()
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+**4. Constructing the Final Code:**
+
+I will rewrite the script using explicit `FreeCAD` and `FreeCADGui` namespaces.
+
+One detail: `FreeCAD.Vector` requires the module to be imported.
+`import FreeCAD` is there.
+
+Also, there's a specific line in the arms section:
+`rot = FreeCAD.Rotation(FreeCAD.Vector(0,0,1), 90)`
+This is fine.
+
+Let's double check the `App` variable substitution.
+The error was strict: `name 'App' is not defined`.
+This confirms I must replace `App` with `FreeCAD` and `Gui` with `FreeCADGui`.
+
+One minor thing: The prompt includes `Selection Info: Object: MyBox`. This might be noise from a previous copy-paste operation or indicates the user selected something. However, the code creates a new document, so selection context shouldn't matter unless it affects the active document creation. The code explicitly creates a new document, so it should be fine.
+
+The color definitions:
+`col_body = (0.2, 0.6, 0.8, 0.0)`
+In FreeCAD `ShapeColor` takes a tuple `(r, g, b)`. Some versions accept alpha, some ignore it. The original code used 4 tuples. FreeCAD's `ShapeColor` property expects `(r, g, b)`. If a 4-tuple is passed, it might error or truncate. The original code failed *before* execution reached these lines (at `App.newDocument`), so we don't know if this would fail. However, standard FreeCAD color is 3 floats. I will check if 4 floats work. Usually, it's safer to use 3. But the user provided code has 4. I'll stick to what they have to avoid changing logic they might want, but `0.0` alpha might be problematic depending on the FreeCAD version (Material handling). Actually, `ShapeColor` takes `(r,g,b)`. If `a` is provided, it might be ignored or raise an error in some contexts. I will assume the user wants what they wrote. Wait, in standard `ViewObject`, `ShapeColor` is a tuple of 3. Passing 4 might break it. I'll strip the alpha or ensure it's just RGB if I suspect issues. However, simpler is better: just fix the `App`/`Gui` error.
+
+Let's look at the arm rotation logic again.
+`rot = FreeCAD.Rotation(FreeCAD.Vector(0,0,1), 90)`
+This creates a rotation.
+Then: `obj_armL.Placement = FreeCAD.Placement(FreeCAD.Vector(-12, 5, 0), rot)`
+This replaces the placement entirely. This is the correct way to set position and rotation in one go.
+However, the original code for the body and head used:
+`obj_head.Placement.Base = FreeCAD.Vector(...)`
+This is modifying the existing placement object in place. In FreeCAD this often works, but it's brittle. The safest fix is to leave it as is (since we are only fixing the "App not defined" error), unless I see it's clearly broken. But wait, if I replace `App` with `FreeCAD`, the code should run up to that point.
+
+Wait, let's check the imports.
+The user provided:
+```python
+import FreeCAD
+import Part
+import math
+import Mesh
+```
+It is missing `import FreeCADGui`.
+
+**Revised Plan:**
+1. Add `import FreeCADGui`.
+2. Replace `App` with `FreeCAD`.
+3. Replace `Gui` with `FreeCADGui`.
+4. Ensure `FreeCAD` is used for `Vector`, `Rotation`, `Placement`.
+5. Keep logic identical to user request where possible.
+
+Let's verify the color again.
+In the code: `col_body = (0.2, 0.6, 0.8, 0.0)`
+If I run this, it might throw `TypeError: Property 'ShapeColor': (r, g, b) tuple must be provided`. FreeCAD usually expects 3. I will remove the 4th element (alpha) to be safe, or just leave it if I want to minimize changes. Given the error was "NameError", fixing that is priority. But good macros should run. I'll strip the alpha channel in the tuples to ensure compatibility (FreeCAD 0.18/0.19 usually doesn't like 4-tuple for ShapeColor without material settings).
+
+Wait, actually, looking at FreeCAD source, `ShapeColor` is strictly RGB. I will change the colors to RGB tuples.
+
+One more check on the selection info.
+`Selection Info: Object: MyBox`
+This implies the user might have selected a box. The macro overwrites everything by creating a new document. That is consistent with "Create a cartoon person".
+
+Here is the corrected script structure:
+
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# ... (Color defs - strip alpha) ...
+
+# 1. New Doc
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+FreeCADGui.ActiveDocument.activeView().viewDefault() # Or .ActiveView
+
+# ... (Shapes) ...
+
+# 7. View
+FreeCADGui.ActiveDocument.ActiveView.fitAll()
+FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
+```
+
+Wait, `activeView()` vs `ActiveView`.
+In the console: `Gui.ActiveDocument.activeView()` works.
+In scripting: `FreeCADGui.ActiveDocument.ActiveView` is the attribute.
+Let's verify. `FreeCADGui.ActiveDocument` returns a `GuiActiveDocument` object. It has a method `activeView()`. It also has an attribute `ActiveView`. I will use `activeView()` to match the user's likely intent from the console, but `ActiveView` is often safer in scripts. The original code used `Gui.activeDocument().activeView()`. So I should stick to the method call style or correct to attribute. The error in the original was `name 'App' is not defined`, so the line `Gui.activeDocument().activeView().viewDefault()` was never reached. I will fix it to `FreeCADGui.ActiveDocument.activeView()`.
+
+Actually, checking documentation: `Gui.ActiveDocument.ActiveView` is the standard Python API access.
+
+Let's generate the code.
+
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+import Mesh
+
+# ==========================================
+# 1. 创建新文档
+# ==========================================
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+# 设置默认视角
+FreeCADGui.ActiveDocument.activeView().viewDefault()
+
+# ... (rest of code)
+```
+
+I will also strip the Alpha from colors to prevent the next potential error.
+
+One detail: `import Mesh`. The code uses `Part` (BRep geometry). `Mesh` is not used. I will leave it or remove it. I'll leave it.
+
+Final check on the provided error: `name 'App' is not defined`.
+Cause: `App` and `Gui` are not imported.
+Solution: Import `FreeCADGui` and use `FreeCAD.` and `FreeCADGui.` prefixes.
+
+The user provided a specific "Attempt 1" that failed. I will output the corrected code.
+
+One tricky part: `Mesh` is imported but not used. `Part` is used.
+The original code had `col_antenna = (0.8, 0.2, 0.2, 0.0)`. I'll change these to 3-tuples.
+
+Final check on `Antenna` position logic.
+`body_height/2 + head_radius + head_radius - 2`
+This is `10 + 8 + 8 - 2 = 24`.
+`AntennaStick` height is 10.
+So it goes from y=24 to y=34.
+`AntennaBall` position y is `10 + 8 + 8 + 6 = 32`.
+Sphere radius 1.5.
+Bottom of sphere at 30.5. Top of stick at 34. Overlap is 3.5. Seems okay.
+
+I will produce the fixed macro.
+
+Note on "Selection Info": I will ignore it as it relates to the context of the previous turn, and the instruction is just to create the character.
+
+One small fix in the code:
+`Gui.activeDocument().activeView().viewDefault()`
+Should be `FreeCADGui.ActiveDocument.activeView().viewDefault()`.
+
+And at the end:
+`Gui.activeDocument().activeView().fitAll()`
+Should be `FreeCADGui.ActiveDocument.activeView().fitAll()`.
+
+Ready to write.
+</think>
+
+Here is the corrected FreeCAD Python macro.
+
+The main issue in your previous code was that `App` and `Gui` are not standard Python module names; they are internal shortcuts in the FreeCAD GUI console. In a standalone script/macro, you must import `FreeCAD` and `FreeCADGui` explicitly and use the full names (e.g., `FreeCAD.newDocument`, `FreeCADGui.ActiveDocument`).
+
+I have also cleaned up the color definitions to use standard RGB (3 values) to avoid potential errors with the ShapeColor property.
+
+```python
+import FreeCAD
+import FreeCADGui
+import Part
+import math
+
+# ==========================================
+# 1. 创建新文档
+# ==========================================
+FreeCAD.newDocument("CartoonRobot")
+FreeCAD.setActiveDocument("CartoonRobot")
+# 设置默认视角
+FreeCADGui.ActiveDocument.activeView().viewDefault()
+
+# 定义一些颜色 (R, G, B)
+# 范围是 0.0 到 1.0
+col_body = (0.2, 0.6, 0.8)       # 蓝色身体
+col_head = (0.9, 0.9, 0.9)       # 浅灰色头部
+col_eye = (1.0, 1.0, 1.0)       # 白色眼睛
+col_pupil = (0.0, 0.0, 0.0)     # 黑色眼珠
+col_antenna = (0.8, 0.2, 0.2)   # 红色天线
+col_stick = (0.5, 0.5, 0.5)    # 灰色天线杆
+
+# ==========================================
+# 2. 构建身体 (Body)
+# ==========================================
+body_height = 20
+body_radius = 10
+shape_body = Part.makeCylinder(body_radius, body_height)
+
+# 创建 FreeCAD 对象
+obj_body = FreeCAD.ActiveDocument.addObject("Part::Feature", "Body")
+obj_body.Shape = shape_body
+obj_body.ViewObject.ShapeColor = col_body
+# 设置位置：身体底部对齐原点 (圆柱体默认中心在原点，向上下各延伸一半)
+# 这里我们保持默认位置，让圆柱体站在 Z=0 平面 (如果旋转的话)，或者直接放置
+# Part.makeCylinder 生成的圆柱轴向是 Z 轴。
+# 我们这里不需要移动，因为它是中心对称的。
+# 如果想让它底部着地：Z = -body_height/2
+obj_body.Placement.Base = FreeCAD.Vector(0, 0, -body_height/2)
+
+# ==========================================
+# 3. 构建头部 (Head)
+# ==========================================
+head_radius = 8
+shape_head = Part.makeSphere(head_radius)
+
+obj_head = FreeCAD.ActiveDocument.addObject("Part::Feature", "Head")
+obj_head.Shape = shape_head
+obj_head.ViewObject.ShapeColor = col_head
+# 将头部移动到身体上方
+# 身体高度是20，上表面在 Z=10。头部半径8。
+# 头部中心放置在 Z = 10 + 8 - 2 (稍微重叠一点显得可爱)
+obj_head.Placement.Base = FreeCAD.Vector(0, 0, body_height/2 + head_radius - 2)
+
+# ==========================================
+# 4. 构建眼睛 (Eyes)
+# ==========================================
+# 计算头部表面的位置
+head_surface_z = body_height/2 + head_radius - 2 + head_radius # 头部中心 + 半径 = 表面
+eye_z_offset = 1.0 # 眼睛稍微陷进去一点，或者突出来一点
+
+# 左眼
+shape_eyeL = Part.makeSphere(2.5)
+obj_eyeL = FreeCAD.ActiveDocument.addObject("Part::Feature", "EyeL")
+obj_eyeL.Shape = shape_eyeL
+obj_eyeL.ViewObject.ShapeColor = col_eye
+# 眼睛位置：在头部表面上往前突
+obj_eyeL.Placement.Base = FreeCAD.Vector(-3.5, 0, head_surface_z - 1.5)
+
+# 右眼
+shape_eyeR = Part.makeSphere(2.5)
+obj_eyeR = FreeCAD.ActiveDocument.addObject("Part::Feature", "EyeR")
+obj_eyeR.Shape = shape_eyeR
+obj_eyeR.ViewObject.ShapeColor = col_eye
+obj_eyeR.Placement.Base = FreeCAD.Vector(3.5, 0, head_surface_z - 1.5)
+
+# 左眼珠 (Pupil)
+shape_pupilL = Part.makeSphere(1)
+obj_pupilL = FreeCAD
