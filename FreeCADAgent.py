@@ -189,11 +189,11 @@ class CADAssistantPanel(QtWidgets.QWidget):
         url_layout.addWidget(self.url_selector)
         layout.addLayout(url_layout)
 
-        # self.api_key_input = QtWidgets.QTextEdit()
-        # self.api_key_input.setPlaceholderText("LLM API Key (e.g., 'sk-...)')")
+        self.api_key_input = QtWidgets.QTextEdit()
+        self.api_key_input.setPlaceholderText("LLM API Key (e.g., 'sk-...)')")
         # self.api_key_input.setMinimumHeight(10)
-        # layout.addWidget(QtWidgets.QLabel("LLM API Key:"))
-        # layout.addWidget(self.api_key_input)
+        layout.addWidget(QtWidgets.QLabel("LLM API Key:"))
+        layout.addWidget(self.api_key_input)
 
         # Output box
         self.response_output = QtWidgets.QTextEdit()
@@ -446,7 +446,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
 
         timeout = 1200
 
-        api_key = "sk-cp-3QJ9WJkW-mL7wsYUrGn1KP_6GcVWnT1Vup7asuCdhlsmKf9bFL2AVV64YmQ5ixWQq0-duQ3fps6MOlGU1Em1wZNwwycQ_DBnuXDJRES0mbRGQBP5SNSVkK8" # self.api_key_input.toPlainText().strip()
+        api_key =  self.api_key_input.toPlainText().strip()
 
         base_url = self.url_selector.currentText()
 
