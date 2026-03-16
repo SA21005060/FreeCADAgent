@@ -37,9 +37,9 @@ For Mac:
 ## 🚀 Usage in FreeCAD
 1. Open FreeCAD → Macro...
    - Update the `User macros location:` to `your-downloaded-repo-path/macros`
-     - Execute `AutoLoadMyWorkbench.FCMacro` to launch CADialogue
-   - Switch to CADialogue AI Assistant workbench
-   - Click on `AI` icon to launch CADialogue
+     - Execute `AutoLoadMyWorkbench.FCMacro` to launch FreeCADAgent
+   - Switch to FreeCADAgent AI Assistant workbench
+   - Click on `AI` icon to launch FreeCADAgent
 2. Use the docked panel:
     - Type a prompt and press 🚀 Send
     - Record a speech prompt with 🎙 Speak

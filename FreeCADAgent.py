@@ -321,7 +321,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
             self.embedding_model_ready = True
             print("✅ Embedding model loaded in background.")
         except Exception as e:
-            self.response_output.append(f"❌ Failed to load embedding model:\n{str(e)}")
+            self.response_output.setPlainText(f"❌ Failed to load embedding model:\n{str(e)}")
 
     def record_and_transcribe(self):
         # Show immediate UI feedback
@@ -500,7 +500,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
                 ) as f:
                     f.write(user_msg)
             except Exception as save_init_user_msg_ex:
-                self.response_output.append(
+                self.response_output.setPlainText(
                     f"❌ Failed to save logs:\n{str(save_init_user_msg_ex)}"
                 )
 
@@ -559,7 +559,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
                 ) as f:
                     f.write(system_msg)
             except Exception as save_sysmsg_ex:
-                self.response_output.append(
+                self.response_output.setPlainText(
                     f"❌ Failed to save system message log:\n{str(save_sysmsg_ex)}"
                 )
 
@@ -620,19 +620,20 @@ class CADAssistantPanel(QtWidgets.QWidget):
                 True
             )  # Enable confirm after successful macro
             self.reject_button.setEnabled(True)  # Enable reject after successful macro
+            return 
 
-            try:
-                with open(
-                    os.path.join(
-                        log_dir, f"{timestamp}_init_msg_from_{model_name}.txt"
-                    ),
-                    "w",
-                ) as f:
-                    f.write(clean_code)
-            except Exception as save_llm_resp_ex:
-                error_text += (
-                    f"❌ Failed to save LLM response:\n\n{str(save_llm_resp_ex)}"
-                )
+            # try:
+            #     with open(
+            #         os.path.join(
+            #             log_dir, f"{timestamp}_init_msg_from_{model_name}.txt"
+            #         ),
+            #         "w",
+            #     ) as f:
+            #         f.write(clean_code)
+            # except Exception as save_llm_resp_ex:
+            #     error_text += (
+            #         f"❌ Failed to save LLM response:\n\n{str(save_llm_resp_ex)}"
+            #     )
 
         except Exception as outer_ex:
             outer_err_str = str(outer_ex)  # capture immediately
@@ -680,7 +681,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
             return True  # exact match shortcut
 
         if not self.embedding_model_ready:
-            self.response_output.append(
+            self.response_output.setPlainText(
                 "⚠️ Embedding model is still loading. Please try again shortly."
             )
             return False
@@ -707,12 +708,12 @@ class CADAssistantPanel(QtWidgets.QWidget):
                         if prompt_match and selection_match:
                             return entry
                     except Exception as inner_e:
-                        self.response_output.append(
+                        self.response_output.setPlainText(
                             f"⚠️ Skipped corrupted cache entry: {str(inner_e)}"
                         )
 
         except Exception as e:
-            self.response_output.append(f"⚠️ Failed to read cache: {str(e)}")
+            self.response_output.setPlainText(f"⚠️ Failed to read cache: {str(e)}")
 
         return None
 
@@ -720,7 +721,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
         # user_input = input("Describe your FreeCAD part: ")
 
         # Read base instructions
-        self.response_output.append(f" Complex Attempt begin...\n")
+        self.response_output.setPlainText(f" Complex Attempt begin...\n")
         self.response_output.setPlainText("🤖 Attempting auto refinement...\n")
         QtCore.QCoreApplication.processEvents()
 
@@ -730,114 +731,119 @@ class CADAssistantPanel(QtWidgets.QWidget):
             f"{base_instruction}\n\nUser instruction: {user_input}"
             + "\n\n**Output Format Guidelines**: The final generated FreeCAD Python macro must be between ```python and ```"
         )
+        
+        try:
 
-        # Initial LLM generation
-        generated_code = prompt_llm(full_prompt, model_name, api_key, base_url)
+            # Initial LLM generation
+            generated_code = prompt_llm(full_prompt, model_name, api_key, base_url)
 
-        matches = re.findall(r"```(?:python)?\s*(.*?)```", generated_code, re.DOTALL)
-        if matches:
-            generated_code = textwrap.dedent(max(matches, key=len)).strip()
-        else:
-            generated_code = textwrap.dedent(generated_code).strip()
+            matches = re.findall(r"```(?:python)?\s*(.*?)```", generated_code, re.DOTALL)
+            if matches:
+                generated_code = textwrap.dedent(max(matches, key=len)).strip()
+            else:
+                generated_code = textwrap.dedent(generated_code).strip()
 
-        # Append GUI snippet
-        generated_code += "\n\n" + GUI_SNIPPET + screenshot_code
+            # Append GUI snippet
+            generated_code += "\n\n" + GUI_SNIPPET + screenshot_code
 
-        ast.parse(generated_code)
-        exec(generated_code, globals())
-        self.previous_code = generated_code
-        duration_sec = time.time() - start_time if start_time else -1
-        self.response_output.setPlainText(
-            f"✅ Refinement succeeded  (completed in {duration_sec:.2f} seconds):\n\n{generated_code}"
-        )
-        self.confirm_button.setEnabled(True)  # Allow user to confirm refined macro
-        self.reject_button.setEnabled(
-            True
-        )  # Allow user to reject even refined macro if needed
+            ast.parse(generated_code)
+            exec(generated_code, globals())
+            self.previous_code = generated_code
+            duration_sec = time.time() - start_time if start_time else -1
+            self.response_output.setPlainText(
+                f"✅ Refinement succeeded  (completed in {duration_sec:.2f} seconds):\n\n{generated_code}"
+            )
+            self.confirm_button.setEnabled(True)  # Allow user to confirm refined macro
+            self.reject_button.setEnabled(
+                True
+            )  # Allow user to reject even refined macro if needed
 
-        # Save initial script
-        GEN_SCRIPT.write_text(generated_code)
-        self.response_output.append(f"\n     Initial code written to {GEN_SCRIPT}")
+            # Save initial script
+            GEN_SCRIPT.write_text(generated_code)
+            self.response_output.setPlainText(f"\n  Code written to {GEN_SCRIPT}")
+            return
+        
+        finally:
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                start_time = time.time()
-                self.response_output.append(f"\n▶ Attempt {attempt} running FreeCAD...")
-                # success = run_freecad_script()
-                # Attempt to parse and run
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    start_time = time.time()
+                    self.response_output.setPlainText(f"\n▶ Attempt {attempt} running FreeCAD...")
+                    # success = run_freecad_script()
+                    # Attempt to parse and run
 
-                # Read captured FreeCAD logs
-                error_logs = (
-                    LOG_FILE.read_text() if LOG_FILE.exists() else "No log found."
-                )
+                    # Read captured FreeCAD logs
+                    error_logs = (
+                        LOG_FILE.read_text() if LOG_FILE.exists() else "No log found."
+                    )
 
-                # Prepare prompt for LLM to fix the code
-                fix_prompt = (
-                    f"""
-        I want to make the following part using FreeCAD 1.0.1 python scripting
+                    # Prepare prompt for LLM to fix the code
+                    fix_prompt = (
+                        f"""
+            I want to make the following part using FreeCAD 1.0.1 python scripting
 
-        {user_input}
+            {user_input}
 
-        The following FreeCAD script was created but it failed during execution:
+            The following FreeCAD script was created but it failed during execution:
 
-        {generated_code}
+            {generated_code}
 
-        Here is the error log:
-        {error_logs}
+            Here is the error log:
+            {error_logs}
 
-        Please provide a corrected FreeCAD script. Keep the logic same, just correct the given error. Respond with valid FreeCAD 1.0.1 Python code only, no extra comments.
-        """
-                    + "\n\n**Output Format Guidelines**: The final generated FreeCAD Python macro must be between ```python and ```"
-                )
-                # Get fixed code from LLM
-                generated_code = prompt_llm(fix_prompt)
+            Please provide a corrected FreeCAD script. Keep the logic same, just correct the given error. Respond with valid FreeCAD 1.0.1 Python code only, no extra comments.
+            """
+                        + "\n\n**Output Format Guidelines**: The final generated FreeCAD Python macro must be between ```python and ```"
+                    )
+                    # Get fixed code from LLM
+                    generated_code = prompt_llm(fix_prompt)
 
-                # Clean code fences if present
-                matches = re.findall(
-                    r"```(?:python)?\s*(.*?)```", generated_code, re.DOTALL
-                )
-                if matches:
-                    generated_code = textwrap.dedent(max(matches, key=len)).strip()
-                else:
-                    generated_code = textwrap.dedent(generated_code).strip()
+                    # Clean code fences if present
+                    matches = re.findall(
+                        r"```(?:python)?\s*(.*?)```", generated_code, re.DOTALL
+                    )
+                    if matches:
+                        generated_code = textwrap.dedent(max(matches, key=len)).strip()
+                    else:
+                        generated_code = textwrap.dedent(generated_code).strip()
 
-                # Save fixed code for next attempt
-                generated_code = generated_code + "\n\n" + GUI_SNIPPET
+                    # Save fixed code for next attempt
+                    generated_code = generated_code + "\n\n" + GUI_SNIPPET
 
-                ast.parse(generated_code)
-                exec(generated_code, globals())
-                self.previous_code = generated_code
-                duration_sec = time.time() - start_time if start_time else -1
-                self.response_output.setPlainText(
-                    f"✅ Refinement succeeded at attempt {attempt} (completed in {duration_sec:.2f} seconds):\n\n{generated_code}"
-                )
-                self.confirm_button.setEnabled(
-                    True
-                )  # Allow user to confirm refined macro
-                self.reject_button.setEnabled(
-                    True
-                )  # Allow user to reject even refined macro if needed
+                    ast.parse(generated_code)
+                    exec(generated_code, globals())
+                    self.previous_code = generated_code
+                    duration_sec = time.time() - start_time if start_time else -1
+                    self.response_output.setPlainText(
+                        f"✅ Refinement succeeded at attempt {attempt} (completed in {duration_sec:.2f} seconds):\n\n{generated_code}"
+                    )
+                    self.confirm_button.setEnabled(
+                        True
+                    )  # Allow user to confirm refined macro
+                    self.reject_button.setEnabled(
+                        True
+                    )  # Allow user to reject even refined macro if needed
 
-                GEN_SCRIPT.write_text(generated_code)
-                self.response_output.append(
-                    f"     Fixed code written to {GEN_SCRIPT}. successfully..."
-                )
-                return
+                    GEN_SCRIPT.write_text(generated_code)
+                    self.response_output.setPlainText(
+                        f"     Fixed code written to {GEN_SCRIPT}. successfully..."
+                    )
+                    return
 
-                # else:
-                #     print(f"❌ Max retries ({MAX_RETRIES}) reached. Check {LOG_FILE} for details.")
-                #     return False
+                    # else:
+                    #     print(f"❌ Max retries ({MAX_RETRIES}) reached. Check {LOG_FILE} for details.")
+                    #     return False
 
-                # Success! Exit the loop immediately
-            except Exception as e2:
-                error_msg = str(e2)
-                # failed_code = generated_code if 'clean_code' in locals() else "<no code extracted>"
-                self.response_output.append(
-                    f"⚠️ Complex Attempt {attempt} failed. Retrying...\n"
-                )
-                QtCore.QCoreApplication.processEvents()
+                    # Success! Exit the loop immediately
+                except Exception as e2:
+                    error_msg = str(e2)
+                    # failed_code = generated_code if 'clean_code' in locals() else "<no code extracted>"
+                    self.response_output.setPlainText(
+                        f"⚠️ Complex Attempt {attempt} failed. Retrying...\n"
+                    )
+                    QtCore.QCoreApplication.processEvents()
 
-                attempt += 1  # Next retry
+                    attempt += 1  # Next retry
 
     def refine_with_error(
         self,
@@ -892,7 +898,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
                         f.write("--- User Message ---\n")
                         f.write(refine_user_msg)
                 except Exception as e:
-                    self.response_output.append(
+                    self.response_output.setPlainText(
                         f"❌ Failed to save refinement input for attempt {attempt}:\n{str(e)}"
                     )
 
@@ -900,7 +906,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
                 accumulated_refine = ""
 
                 # Show streaming status
-                self.response_output.append(f"🤖 Refining (attempt {attempt})...\n")
+                self.response_output.setPlainText(f"🤖 Refining (attempt {attempt})...\n")
                 QtCore.QCoreApplication.processEvents()
 
                 response = client.chat.completions.create(
@@ -937,7 +943,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
                     with open(refine_response_path, "w") as f:
                         f.write(last_raw_message)
                 except Exception as e:
-                    self.response_output.append(
+                    self.response_output.setPlainText(
                         f"❌ Failed to save refinement response for attempt {attempt}:\n{str(e)}"
                     )
 
@@ -972,7 +978,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
                 failed_code = (
                     clean_code if "clean_code" in locals() else "<no code extracted>"
                 )
-                self.response_output.append(
+                self.response_output.setPlainText(
                     f"⚠️ Attempt {attempt} failed. Retrying...\n"
                 )
                 QtCore.QCoreApplication.processEvents()
@@ -989,7 +995,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
         # end_time = time.time()
         # duration_sec = end_time - start_time if start_time else -1
         # failure_log = f"🕒 Total time before failure: {duration_sec:.2f} seconds."
-        # self.response_output.append(failure_log)
+        # self.response_output.setPlainText(failure_log)
 
         self.complexCAD(
             user_input=messages,
@@ -1004,13 +1010,13 @@ class CADAssistantPanel(QtWidgets.QWidget):
         #     ) as f:
         #         f.write(f"{duration_sec:.2f} seconds\n")
         # except Exception as e:
-        #     self.response_output.append(
+        #     self.response_output.setPlainText(
         #         f"❌ Failed to save failure time log:\n{str(e)}"
         #     )
 
     def confirm_macro_as_good(self):
         if not self.previous_code:
-            self.response_output.append("❌ No macro to confirm.")
+            self.response_output.setPlainText("❌ No macro to confirm.")
             return
 
         prompt = self.prompt_input.toPlainText().strip()
@@ -1038,12 +1044,12 @@ class CADAssistantPanel(QtWidgets.QWidget):
             self.confirm_button.setEnabled(False)
             self.reject_button.setEnabled(False)
         except Exception as e:
-            self.response_output.append(f"❌ Failed to save confirmed macro:\n{str(e)}")
+            self.response_output.setPlainText(f"❌ Failed to save confirmed macro:\n{str(e)}")
 
     def reject_cached_macro(self):
         prompt = self.prompt_input.toPlainText().strip()
         self.reject_button.setEnabled(False)  # Disable to prevent re-click
-        self.response_output.append(
+        self.response_output.setPlainText(
             "👎 User rejected cached macro. Sending prompt to LLM..."
         )
         self.reject_button.setEnabled(False)
@@ -1065,7 +1071,7 @@ class CADAssistantPanel(QtWidgets.QWidget):
             with open(rejected_file, "a") as f:
                 f.write(json.dumps(rejected_record) + "\n")
         except Exception as e:
-            self.response_output.append(f"⚠️ Failed to log rejected macro: {str(e)}")
+            self.response_output.setPlainText(f"⚠️ Failed to log rejected macro: {str(e)}")
 
         # Clear any cached state before retry
         self.previous_code = None
